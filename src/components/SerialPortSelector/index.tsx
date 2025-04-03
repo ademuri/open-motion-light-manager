@@ -11,11 +11,11 @@ function SerialPortSelector() {
     });
   };
 
-  navigator.serial.addEventListener("connect", (e) => {
+  navigator.serial.addEventListener("connect", (_e) => {
     onPortChange();
   });
 
-  navigator.serial.addEventListener("disconnect", (e) => {
+  navigator.serial.addEventListener("disconnect", (_e) => {
     onPortChange();
   });
 
