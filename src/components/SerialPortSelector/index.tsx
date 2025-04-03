@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 function SerialPortSelector() {
-  const [selectedPort, setSelectedPort] = useState(null);
+  const [selectedPort, setSelectedPort] = useState<SerialPort | null>(null);
 
   const onPortChange = () => {
     navigator.serial.getPorts().then((ports) => {
