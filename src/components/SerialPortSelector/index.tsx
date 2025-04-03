@@ -1,25 +1,43 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-function SerialPortSelector() {
+function SerialPortSelector({
+  setSelectedPortOnParent,
+}: {
+  setSelectedPortOnParent: (port: SerialPort | null) => void;
+}) {
   const [selectedPort, setSelectedPort] = useState<SerialPort | null>(null);
 
-  const onPortChange = () => {
-    navigator.serial.getPorts().then((ports) => {
-      if (ports.length > 0) {
-        setSelectedPort(ports[0]);
-      }
-    });
-  };
+  useEffect(() => {
+    const onPortChange = () => {
+      console.log("SerialPortSelector::onPortChange");
+      navigator.serial.getPorts().then((ports) => {
+        if (selectedPort === ports[0]) {
+          return;
+        }
+        if (ports.length > 0) {
+          setSelectedPort(ports[0]);
+          setSelectedPortOnParent(ports[0]);
+        }
+      });
+    };
 
-  navigator.serial.addEventListener("connect", (_e) => {
+    const connectionChangedHandler = () => {
+      onPortChange();
+    };
+
+    navigator.serial.addEventListener("connect", connectionChangedHandler);
+    navigator.serial.addEventListener("disconnect", connectionChangedHandler);
+
     onPortChange();
-  });
 
-  navigator.serial.addEventListener("disconnect", (_e) => {
-    onPortChange();
-  });
-
-  onPortChange();
+    return () => {
+      navigator.serial.removeEventListener("connect", connectionChangedHandler);
+      navigator.serial.removeEventListener(
+        "disconnect",
+        connectionChangedHandler
+      );
+    };
+  }, [selectedPort, setSelectedPortOnParent]);
 
   const handleChoosePort = () => {
     navigator.serial
@@ -34,6 +52,7 @@ function SerialPortSelector() {
       .then((port) => {
         // TODO: connect to port
         setSelectedPort(port);
+        setSelectedPortOnParent(port);
       })
       .catch((e) => {
         // TODO: error handling
@@ -47,6 +66,7 @@ function SerialPortSelector() {
     }
     selectedPort.forget();
     setSelectedPort(null);
+    setSelectedPortOnParent(null);
     handleChoosePort();
   };
 
