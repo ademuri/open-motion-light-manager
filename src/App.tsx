@@ -72,7 +72,7 @@ function App() {
       <div className="status-section">
         {error ? <div className="error-message">{error}</div> : null}
         {response !== null ? (
-          <DeviceStatus status={status} />
+          <DeviceStatus connected={portConnected} status={status} />
         ) : null}
       </div>
     </div>

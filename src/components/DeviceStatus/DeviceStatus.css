@@ -25,3 +25,7 @@
   margin-right: 5px;
   color: #ddd; /* Slightly darker label text */
 }
+
+.disconnected {
+  font-style: italic;
+}
