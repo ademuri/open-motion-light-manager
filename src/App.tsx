@@ -3,13 +3,16 @@ import "./App.css";
 import SerialPortSelector from "./components/SerialPortSelector";
 // import { SerialResponse } from "../proto_out/serial.ts";
 import { useSerialPort } from "./hooks/useSerialPort";
-import { SerialRequest } from "../proto_out/serial";
+import { SerialRequest, SerialResponse } from "../proto_out/serial";
 
 function App() {
   const [selectedPort, setSelectedPort] = useState<SerialPort | null>(null);
   const [portConnected, setPortConnected] = useState(false);
+  const [serialResponse, setSerialResponse] = useState<SerialResponse | null>(
+    null
+  );
+  const [serialError, setSerialError] = useState("");
   const portOpeningRef = useRef(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
 
   useEffect(() => {
     if (selectedPort === null || portOpeningRef.current) {
@@ -46,24 +49,30 @@ function App() {
     }
 
     const request = SerialRequest.create();
-    useSerialPort(selectedPort, request).then(({response, error}) => {
-      console.log(response);
-      console.log(error);
-      setDataLoaded(true);
-    })
-    .catch((error) => {
-      console.log(error);
-    })
-    .finally(() => {
-      console.log("finally");
-    });
-  }, [selectedPort, portConnected, dataLoaded]);
+    useSerialPort(selectedPort, request)
+      .then(({ response, error }) => {
+        console.log(response);
+        console.log(error);
+        setSerialResponse(response);
+        setSerialError(error);
+      })
+      .catch((error) => {
+        console.log(error);
+        setSerialError(error);
+      });
+  }, [selectedPort, portConnected]);
 
   return (
     <>
       <SerialPortSelector
         setSelectedPortOnParent={setSelectedPort}
       ></SerialPortSelector>
+      <div>
+        {serialError ? <div>{serialError}</div> : null}
+        {serialResponse !== null ? (
+          <div>{SerialResponse.toJsonString(serialResponse)}</div>
+        ) : null}
+      </div>
     </>
   );
 }

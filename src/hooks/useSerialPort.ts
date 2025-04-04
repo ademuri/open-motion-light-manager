@@ -8,8 +8,6 @@ export async function useSerialPort(
   let response: SerialResponse | null = null;
   let error = "";
 
-  console.log("useSerialPort running");
-
   if (port === null) {
     error = "port is null";
     return { response, error };
@@ -28,7 +26,6 @@ export async function useSerialPort(
   requestDataWithLength[0] = length;
   requestDataWithLength.set(requestData, 1);
 
-  console.log(`useSerialPort writing: ${requestDataWithLength.length}`);
   await writer.write(requestDataWithLength);
   writer.releaseLock();
 
@@ -83,6 +80,5 @@ export async function useSerialPort(
     reader.releaseLock();
   }
 
-  console.log("useSerialPort success!");
   return { response, error };
 }
