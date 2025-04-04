@@ -25,3 +25,5 @@ export function compileProto() {
     throw error; // Re-throw to stop the build
   }
 }
+
+compileProto();
