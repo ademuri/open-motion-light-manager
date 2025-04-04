@@ -1,7 +1,34 @@
+import { useCallback, useState } from "react";
 import { SerialRequest, SerialResponse } from "../../proto_out/serial.ts";
 
+export function useSerialCommunication(port: SerialPort | null) {
+  const [response, setResponse] = useState<SerialResponse | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const sendRequest = useCallback(
+    async (request: SerialRequest) => {
+      if (!port) return;
+
+      setLoading(true);
+      try {
+        const result = await communicateWithSerialPort(port, request);
+        setResponse(result.response);
+        setError(result.error);
+      } catch (err) {
+        setError(String(err));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [port]
+  );
+
+  return { response, error, loading, sendRequest };
+}
+
 // Given an open serial port, writes out the request and reads back the response.
-export async function useSerialPort(
+async function communicateWithSerialPort(
   port: SerialPort | null,
   request: SerialRequest
 ): Promise<{ response: SerialResponse | null; error: string }> {
@@ -20,7 +47,7 @@ export async function useSerialPort(
   }
   const requestData = SerialRequest.toBinary(request);
   if (requestData.length & 0x80) {
-    return {response, error: "Request too long, varint not implemented"};
+    return { response, error: "Request too long, varint not implemented" };
   }
   const requestDataWithLength = new Uint8Array(length + 1);
   requestDataWithLength[0] = length;
@@ -64,10 +91,9 @@ export async function useSerialPort(
     }
 
     if (data[0] != data.length - 1) {
-      error =
-        `Data length ${data.length - 1} does not match expected length ${
-          data[0]
-        }`;
+      error = `Data length ${data.length - 1} does not match expected length ${
+        data[0]
+      }`;
       return { response, error };
     }
 

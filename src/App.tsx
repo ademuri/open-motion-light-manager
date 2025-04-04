@@ -1,17 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import SerialPortSelector from "./components/SerialPortSelector";
-// import { SerialResponse } from "../proto_out/serial.ts";
-import { useSerialPort } from "./hooks/useSerialPort";
+import { useSerialCommunication } from "./hooks/useSerialPort";
 import { SerialRequest, SerialResponse } from "../proto_out/serial";
 
 function App() {
   const [selectedPort, setSelectedPort] = useState<SerialPort | null>(null);
   const [portConnected, setPortConnected] = useState(false);
-  const [serialResponse, setSerialResponse] = useState<SerialResponse | null>(
-    null
-  );
-  const [serialError, setSerialError] = useState("");
   const portOpeningRef = useRef(false);
 
   useEffect(() => {
@@ -41,26 +36,19 @@ function App() {
       });
   }, [selectedPort]);
 
-  useEffect(() => {
-    console.log("Second useEffect running");
-    if (!portConnected) {
-      console.log("useEffect: port not connected, returning");
-      return;
-    }
+  const {
+    response,
+    error,
+    loading: _loading,
+    sendRequest,
+  } = useSerialCommunication(selectedPort);
 
-    const request = SerialRequest.create();
-    useSerialPort(selectedPort, request)
-      .then(({ response, error }) => {
-        console.log(response);
-        console.log(error);
-        setSerialResponse(response);
-        setSerialError(error);
-      })
-      .catch((error) => {
-        console.log(error);
-        setSerialError(error);
-      });
-  }, [selectedPort, portConnected]);
+  useEffect(() => {
+    if (portConnected) {
+      const request = SerialRequest.create();
+      sendRequest(request);
+    }
+  }, [portConnected, sendRequest]);
 
   return (
     <>
@@ -68,9 +56,9 @@ function App() {
         setSelectedPortOnParent={setSelectedPort}
       ></SerialPortSelector>
       <div>
-        {serialError ? <div>{serialError}</div> : null}
-        {serialResponse !== null ? (
-          <div>{SerialResponse.toJsonString(serialResponse)}</div>
+        {error ? <div>{error}</div> : null}
+        {response !== null ? (
+          <div>{SerialResponse.toJsonString(response)}</div>
         ) : null}
       </div>
     </>
