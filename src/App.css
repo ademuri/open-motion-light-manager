@@ -40,3 +40,18 @@
 .read-the-docs {
   color: #888;
 }
+
+.app-container {
+  color: #eee; /* Light text for the whole app */
+  min-height: 100vh; /* Ensure full viewport height */
+  padding: 20px;
+}
+
+.status-section {
+  margin-top: 20px;
+}
+
+.error-message {
+  color: #f00; /* Red error text */
+  margin-bottom: 10px;
+}

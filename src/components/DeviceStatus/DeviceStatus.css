@@ -1,0 +1,27 @@
+/* DeviceStatus.css */
+.device-status-container {
+  border: 1px solid #555; /* Darker border */
+  padding: 10px;
+  margin: 10px;
+  border-radius: 5px;
+  background-color: #333; /* Darker background */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4); /* Darker shadow */
+  color: #eee; /* Light text */
+}
+
+.device-status-header {
+  font-weight: bold;
+  margin-bottom: 10px;
+  font-size: 1.1em;
+  color: #fff; /* White header text */
+}
+
+.device-status-item {
+  margin-bottom: 5px;
+}
+
+.device-status-label {
+  font-weight: bold;
+  margin-right: 5px;
+  color: #ddd; /* Slightly darker label text */
+}
