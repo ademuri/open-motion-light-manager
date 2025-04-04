@@ -26,6 +26,7 @@ jobs:
 
       - name: Compile protobuf
         run: npm run compile-proto
+        working-directory: ./
 
       - name: Build project
         run: npm run build

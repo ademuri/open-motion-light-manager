@@ -2,7 +2,7 @@ import { defineConfig, Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import * as path from "path";
-import { compileProto } from "./scripts/compile-proto";
+import { compileProto } from "./scripts/compile-proto.js";
 
 
 // https://vite.dev/config/
