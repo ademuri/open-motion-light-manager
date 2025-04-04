@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+import "google/protobuf/descriptor.proto";
+
+// Implements just what's needed from
+// https://github.com/nanopb/nanopb/blob/master/generator/proto/nanopb.proto
+
+message NanoPBOptions {
+  // Allocated size for 'bytes' and 'string' fields.
+  // For string fields, this should include the space for null terminator.
+  optional int32 max_size = 1;
+}
+
+extend google.protobuf.FieldOptions { optional NanoPBOptions nanopb = 1010; }

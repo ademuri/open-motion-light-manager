@@ -10,8 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@protobuf-ts/plugin": "^2.9.6",
     "@types/w3c-web-serial": "^1.0.8",
-    "protobufjs": "^7.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router": "^7.4.1",
