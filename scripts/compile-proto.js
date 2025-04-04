@@ -14,10 +14,9 @@ export function compileProto() {
 
   try {
     console.log("Compiling protobuf files...");
-    execSync(
-      `npx protoc --ts_out ${outputDir} --proto_path ${protoDir} --proto_path src/proto ${protoFiles}`,
-      { stdio: "inherit" }
-    );
+    const command = `npx protoc --ts_out ${outputDir} --proto_path ${protoDir} --proto_path src/proto ${protoFiles}`;
+    console.log(`Executing command: ${command}`);
+    execSync(command, { stdio: "inherit" });
     console.log("Protobuf files compiled successfully.");
   } catch (error) {
     console.error("Error compiling protobuf files:", error);
