@@ -22,9 +22,9 @@ jobs:
       - name: Install dependencies
         uses: bahmutov/npm-install@v1
 
-      # - name: Compile protobuf
-      #   run: npm run compile-proto
-      #   working-directory: ./
+      - name: Compile protobuf
+        run: npm run compile-proto
+        working-directory: ./
 
       - name: Build project
         run: npm run build
