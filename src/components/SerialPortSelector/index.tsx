@@ -9,7 +9,6 @@ function SerialPortSelector({
 
   useEffect(() => {
     const onPortChange = () => {
-      console.log("SerialPortSelector::onPortChange");
       navigator.serial.getPorts().then((ports) => {
         if (selectedPort === ports[0]) {
           return;
@@ -50,13 +49,12 @@ function SerialPortSelector({
         ],
       })
       .then((port) => {
-        // TODO: connect to port
         setSelectedPort(port);
         setSelectedPortOnParent(port);
       })
       .catch((e) => {
         // TODO: error handling
-        console.log(e);
+        console.error(e);
       });
   };
 
