@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = git@github.com:ademuri/open-motion-light-protos.git
+	branch = main
+	commit = 9f5b4a7705f3684fec1c3ec7b6c079dda87e537e
+	parent = 95fbe3e9717a53cacbf80a43074fb350434b6d3f
+	method = rebase
+	cmdver = 0.4.9
