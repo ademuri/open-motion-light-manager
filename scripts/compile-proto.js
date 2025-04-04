@@ -6,6 +6,8 @@ export function compileProto() {
   const outputDir = "proto_out";
   const protoFiles = "proto/*.proto";
 
+  console.log("compileProto() running");
+
   // Ensure the output directory exists
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
