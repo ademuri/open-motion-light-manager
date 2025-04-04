@@ -73,17 +73,6 @@ async function communicateWithSerialPort(
       error = "Failed to read any data";
       return { response, error };
     }
-    console.log("Read " + data.length + " bytes");
-    const hexString = Array.from(data)
-      .map((byte) => {
-        if (typeof byte !== "number") {
-          console.error("Unexpected non-number byte:", byte);
-          return "??";
-        }
-        return byte.toString(16).padStart(2, "0");
-      })
-      .join(" ");
-    console.log(`Data (hex): ${hexString}`);
 
     if (data[0] & 0x80) {
       error = "Data too long - varint not implemented";
