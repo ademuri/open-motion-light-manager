@@ -16,6 +16,10 @@ function SerialPortSelector({
         if (ports.length > 0) {
           setSelectedPort(ports[0]);
           setSelectedPortOnParent(ports[0]);
+        } else {
+          console.log("Null port");
+          setSelectedPort(null);
+          setSelectedPortOnParent(null);
         }
       });
     };

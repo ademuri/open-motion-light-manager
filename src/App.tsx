@@ -46,6 +46,12 @@ function App() {
   } = useSerialCommunication(selectedPort);
 
   useEffect(() => {
+    navigator.serial.addEventListener("disconnect", () => {
+      setPortConnected(false);
+    });
+  });
+
+  useEffect(() => {
     if (portConnected) {
       const request = SerialRequest.create();
       sendRequest(request);
