@@ -22,19 +22,12 @@ jobs:
       - name: Install dependencies
         uses: bahmutov/npm-install@v1
 
-      - name: Compile protobuf
-        run: |
-          echo "Directory contents BEFORE compile-proto:"
-          ls -la
-          npm run compile-proto
-          echo "Directory contents AFTER compile-proto:"
-          ls -la proto_out
-        working-directory: ./
+      # - name: Compile protobuf
+      #   run: npm run compile-proto
+      #   working-directory: ./
 
       - name: Build project
-        run: |
-          echo "Running build"
-          npm run build
+        run: npm run build
         working-directory: ./
 
       - name: Lint project
