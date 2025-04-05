@@ -17,7 +17,6 @@ function SerialPortSelector({
           setSelectedPort(ports[0]);
           setSelectedPortOnParent(ports[0]);
         } else {
-          console.log("Null port");
           setSelectedPort(null);
           setSelectedPortOnParent(null);
         }
@@ -72,6 +71,15 @@ function SerialPortSelector({
     handleChoosePort();
   };
 
+  const handleForgetPort = () => {
+    if (selectedPort === null) {
+      return;
+    }
+    selectedPort.forget();
+    setSelectedPort(null);
+    setSelectedPortOnParent(null);
+  }
+
   return (
     <>
       {selectedPort === null ? (
@@ -82,6 +90,7 @@ function SerialPortSelector({
             <span>Connected</span>
           </div>
           <button onClick={handleChangePort}>Change port</button>
+          <button onClick={handleForgetPort}>Forget port</button>
         </>
       )}
     </>
