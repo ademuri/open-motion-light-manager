@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import "./App.css";
 import SerialPortSelector from "./components/SerialPortSelector";
 import { useSerialCommunication } from "./hooks/useSerialPort";
@@ -11,7 +11,7 @@ function App() {
   const portOpeningRef = useRef(false);
   const [status, setStatus] = useState<StatusPb | null>(null);
 
-  useEffect(() => {
+  const openPort = useCallback(async () => {
     if (selectedPort === null || portOpeningRef.current) {
       return;
     }
@@ -25,18 +25,31 @@ function App() {
     portOpeningRef.current = true;
 
     console.log("Opening port...");
-    selectedPort
-      .open({ baudRate: 115200 })
-      .catch((error) => {
-        console.log("Error opening port: ", error);
-        portOpeningRef.current = false;
-      })
-      .then(async () => {
-        console.log("Connected!");
-        portOpeningRef.current = false;
-        setPortConnected(true);
-      });
+    try {
+      await selectedPort.open({ baudRate: 115200 });
+      console.log("Connected!");
+      setPortConnected(true);
+    } catch (error) {
+      console.log("Error opening port: ", error);
+    } finally {
+      portOpeningRef.current = false;
+    }
   }, [selectedPort]);
+
+  useEffect(() => {
+    openPort();
+  }, [openPort]);
+
+  useEffect(() => {
+    if (selectedPort !== null && !portConnected) {
+      const intervalId = setInterval(() => {
+        console.log("Retrying port connection...");
+        openPort();
+      }, 1000);
+
+      return () => clearInterval(intervalId);
+    }
+  }, [selectedPort, portConnected, openPort]);
 
   const {
     response,
@@ -49,14 +62,30 @@ function App() {
     navigator.serial.addEventListener("disconnect", () => {
       setPortConnected(false);
     });
-  });
+  }, []);
+
+  const sendInitialRequest = useCallback(() => {
+    const request = SerialRequest.create();
+    sendRequest(request);
+  }, [sendRequest]);
 
   useEffect(() => {
     if (portConnected) {
-      const request = SerialRequest.create();
-      sendRequest(request);
+      sendInitialRequest();
     }
-  }, [portConnected, sendRequest]);
+  }, [portConnected, sendInitialRequest]);
+
+  useEffect(() => {
+    const timeoutId = setInterval(() => {
+      if (portConnected) {
+        sendInitialRequest();
+      }
+    }, 1000);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [portConnected, error, sendInitialRequest]);
 
   useEffect(() => {
     if (response?.status) {
@@ -70,7 +99,9 @@ function App() {
         setSelectedPortOnParent={setSelectedPort}
       ></SerialPortSelector>
       <div className="status-section">
-        {error ? <div className="error-message">{error}</div> : null}
+        {error.length > 0 && selectedPort !== null ? (
+          <div className="error-message">{error}</div>
+        ) : null}
         {response !== null ? (
           <DeviceStatus connected={portConnected} status={status} />
         ) : null}

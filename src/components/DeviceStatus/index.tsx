@@ -26,7 +26,9 @@ function DeviceStatus({
       </div>
       <div className="device-status-item">
         <span className="device-status-label">Battery Voltage:</span>{" "}
-        {status.batteryVoltage}
+        {status.batteryVoltageMillivolts
+          ? status.batteryVoltageMillivolts / 1000
+          : "-"}
       </div>
     </div>
   );
