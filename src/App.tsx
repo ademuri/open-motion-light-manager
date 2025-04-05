@@ -76,14 +76,18 @@ function App() {
   }, [portConnected, sendInitialRequest]);
 
   useEffect(() => {
-    const timeoutId = setInterval(() => {
-      if (portConnected) {
+    let count = 0;
+    const intervalId = setInterval(() => {
+      count++;
+
+      // Refresh quickly for error and slowly otherwise
+      if (portConnected && (error.length > 0 || count % 10 === 0)) {
         sendInitialRequest();
       }
     }, 1000);
 
     return () => {
-      clearTimeout(timeoutId);
+      clearInterval(intervalId);
     };
   }, [portConnected, error, sendInitialRequest]);
 
