@@ -26,7 +26,7 @@ function App() {
 
     console.log("Opening port...");
     try {
-      await selectedPort.open({ baudRate: 115200 });
+      await selectedPort.open({ baudRate: 115200, bufferSize: 1000 });
       console.log("Connected!");
       setPortConnected(true);
     } catch (error) {
@@ -75,21 +75,22 @@ function App() {
     }
   }, [portConnected, sendInitialRequest]);
 
-  useEffect(() => {
-    let count = 0;
-    const intervalId = setInterval(() => {
-      count++;
+  // TODO: re-enable and add some error correction
+  // useEffect(() => {
+  //   let count = 0;
+  //   const intervalId = setInterval(() => {
+  //     count++;
 
-      // Refresh quickly for error and slowly otherwise
-      if (portConnected && (error.length > 0 || count % 10 === 0)) {
-        sendInitialRequest();
-      }
-    }, 1000);
+  //     // Refresh quickly for error and slowly otherwise
+  //     if (portConnected && (error.length > 0 || count % 10 === 0)) {
+  //       sendInitialRequest();
+  //     }
+  //   }, 1000);
 
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [portConnected, error, sendInitialRequest]);
+  //   return () => {
+  //     clearInterval(intervalId);
+  //   };
+  // }, [portConnected, error, sendInitialRequest]);
 
   useEffect(() => {
     if (response?.status) {
@@ -109,6 +110,7 @@ function App() {
         {response !== null ? (
           <DeviceStatus connected={portConnected} status={status} />
         ) : null}
+        {selectedPort !== null && <button onClick={sendInitialRequest}>Refresh</button>}
       </div>
     </div>
   );
