@@ -4,6 +4,7 @@ import SerialPortSelector from "./components/SerialPortSelector";
 import { useSerialCommunication } from "./hooks/useSerialPort";
 import { SerialRequest, StatusPb } from "../proto_out/serial";
 import DeviceStatus from "./components/DeviceStatus";
+import DeviceConfig from "./components/DeviceConfig";
 
 function App() {
   const [selectedPort, setSelectedPort] = useState<SerialPort | null>(null);
@@ -107,6 +108,9 @@ function App() {
         {error.length > 0 && selectedPort !== null ? (
           <div className="error-message">{error}</div>
         ) : null}
+        {response !== null && response.config != null && (
+          <DeviceConfig config={response.config} />
+        )}
         {response !== null ? (
           <DeviceStatus connected={portConnected} status={status} />
         ) : null}

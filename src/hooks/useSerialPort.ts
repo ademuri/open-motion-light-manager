@@ -16,7 +16,8 @@ export function useSerialCommunication(port: SerialPort | null) {
         setResponse(result.response);
         setError(result.error);
       } catch (err) {
-        setError(String(err));
+        setError(`Uncaught error: ${String(err)}`);
+        console.log(err);
       } finally {
         setLoading(false);
       }
@@ -49,9 +50,14 @@ async function communicateWithSerialPort(
   if (requestData.length & 0x80) {
     return { response, error: "Request too long, varint not implemented" };
   }
+  console.log(`request: ${SerialRequest.toJsonString(request)}`);
+  const length = requestData.length;
   const requestDataWithLength = new Uint8Array(length + 1);
+  console.log(`request length: ${length}`);
   requestDataWithLength[0] = length;
-  requestDataWithLength.set(requestData, 1);
+  if (length > 0) {
+    requestDataWithLength.set(requestData, 1);
+  }
 
   await writer.write(requestDataWithLength);
   writer.releaseLock();
@@ -94,6 +100,8 @@ async function communicateWithSerialPort(
   } finally {
     reader.releaseLock();
   }
+
+  console.log(SerialResponse.toJsonString(response));
 
   return { response, error };
 }
