@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import "./App.css";
 import SerialPortSelector from "./components/SerialPortSelector";
 import { useSerialCommunication } from "./hooks/useSerialPort";
-import { SerialRequest, StatusPb } from "../proto_out/serial";
+import { ConfigPb, SerialRequest, StatusPb } from "../proto_out/serial";
 import DeviceStatus from "./components/DeviceStatus";
 import DeviceConfig from "./components/DeviceConfig";
 
@@ -67,6 +67,14 @@ function App() {
 
   const sendInitialRequest = useCallback(() => {
     const request = SerialRequest.create();
+    request.requestConfig = true;
+    sendRequest(request);
+  }, [sendRequest]);
+
+  const sendConfig = useCallback((config: ConfigPb) => {
+    const request = SerialRequest.create();
+    request.requestConfig = true;
+    request.config = config;
     sendRequest(request);
   }, [sendRequest]);
 
@@ -109,7 +117,7 @@ function App() {
           <div className="error-message">{error}</div>
         ) : null}
         {response !== null && response.config != null && (
-          <DeviceConfig config={response.config} />
+          <DeviceConfig config={response.config} setConfig={sendConfig} />
         )}
         {response !== null ? (
           <DeviceStatus connected={portConnected} status={status} />

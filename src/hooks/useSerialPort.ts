@@ -46,11 +46,11 @@ async function communicateWithSerialPort(
     error = "Port not writable";
     return { response, error };
   }
+  console.log(`request: ${SerialRequest.toJsonString(request)}`);
   const requestData = SerialRequest.toBinary(request);
   if (requestData.length & 0x80) {
     return { response, error: "Request too long, varint not implemented" };
   }
-  console.log(`request: ${SerialRequest.toJsonString(request)}`);
   const length = requestData.length;
   const requestDataWithLength = new Uint8Array(length + 1);
   console.log(`request length: ${length}`);
