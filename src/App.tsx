@@ -71,12 +71,15 @@ function App() {
     sendRequest(request);
   }, [sendRequest]);
 
-  const sendConfig = useCallback((config: ConfigPb) => {
-    const request = SerialRequest.create();
-    request.requestConfig = true;
-    request.config = config;
-    sendRequest(request);
-  }, [sendRequest]);
+  const sendConfig = useCallback(
+    (config: ConfigPb) => {
+      const request = SerialRequest.create();
+      request.requestConfig = true;
+      request.config = config;
+      sendRequest(request);
+    },
+    [sendRequest]
+  );
 
   useEffect(() => {
     if (portConnected) {
@@ -84,22 +87,18 @@ function App() {
     }
   }, [portConnected, sendInitialRequest]);
 
-  // TODO: re-enable and add some error correction
-  // useEffect(() => {
-  //   let count = 0;
-  //   const intervalId = setInterval(() => {
-  //     count++;
+  // Refresh status on error
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (portConnected && error.length > 0) {
+        sendInitialRequest();
+      }
+    }, 100);
 
-  //     // Refresh quickly for error and slowly otherwise
-  //     if (portConnected && (error.length > 0 || count % 10 === 0)) {
-  //       sendInitialRequest();
-  //     }
-  //   }, 1000);
-
-  //   return () => {
-  //     clearInterval(intervalId);
-  //   };
-  // }, [portConnected, error, sendInitialRequest]);
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [portConnected, error, sendInitialRequest]);
 
   useEffect(() => {
     if (response?.status) {
@@ -122,7 +121,9 @@ function App() {
         {response !== null ? (
           <DeviceStatus connected={portConnected} status={status} />
         ) : null}
-        {selectedPort !== null && <button onClick={sendInitialRequest}>Refresh</button>}
+        {selectedPort !== null && (
+          <button onClick={sendInitialRequest}>Refresh</button>
+        )}
       </div>
     </div>
   );
