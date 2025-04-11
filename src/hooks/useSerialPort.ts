@@ -46,21 +46,24 @@ async function communicateWithSerialPort(
     error = "Port not writable";
     return { response, error };
   }
-  console.log(`request: ${SerialRequest.toJsonString(request)}`);
+  // console.log(`request: ${SerialRequest.toJsonString(request)}`);
   const requestData = SerialRequest.toBinary(request);
   if (requestData.length & 0x80) {
     return { response, error: "Request too long, varint not implemented" };
   }
   const length = requestData.length;
   const requestDataWithLength = new Uint8Array(length + 1);
-  console.log(`request length: ${length}`);
+  // console.log(`request length: ${length}`);
   requestDataWithLength[0] = length;
   if (length > 0) {
     requestDataWithLength.set(requestData, 1);
   }
 
-  await writer.write(requestDataWithLength);
-  writer.releaseLock();
+  try {
+    await writer.write(requestDataWithLength);
+  } finally {
+    writer.releaseLock();
+  }
 
   const reader = port.readable?.getReader();
   if (!reader) {
@@ -85,6 +88,11 @@ async function communicateWithSerialPort(
       return { response, error };
     }
 
+    console.log(
+      `Received data bytes (hex): ${Array.from(data)
+        .map((byte) => byte.toString(16).toUpperCase().padStart(2, "0"))
+        .join(" ")}`
+    );
     if (data[0] != data.length - 1) {
       error = `Data length ${data.length - 1} does not match expected length ${
         data[0]
@@ -96,12 +104,25 @@ async function communicateWithSerialPort(
     response = SerialResponse.fromBinary(dataWithoutLength);
   } catch (e) {
     error = "Error reading from port: " + e;
-    return { response, error };
+    // Don't return here, let finally run
   } finally {
-    reader.releaseLock();
+    // Ensure the reader lock is always released
+    if (reader) {
+      try {
+        reader.releaseLock();
+      } catch (lockError) {
+        // Handle potential error if the lock was already released or the reader is closed.
+        console.error("Error releasing reader lock:", lockError);
+        // If an error wasn't already set, set one now.
+        if (!error) {
+          error = "Error releasing reader lock: " + lockError;
+        }
+      }
+    }
   }
 
-  console.log(SerialResponse.toJsonString(response));
+  // console.log(SerialResponse.toJsonString(response));
 
+  // Now return the result after finally block has executed
   return { response, error };
 }
