@@ -4,16 +4,27 @@ import basicSsl from "@vitejs/plugin-basic-ssl";
 import * as path from "path";
 import { compileProto } from "./scripts/compile-proto.js";
 
+const repoName = "open-motion-light-manager"; // Example
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), basicSsl(), protobufPlugin()],
-  server: {
-    https: {},
-  },
-  preview: {
-    https: {},
-  },
+export default defineConfig(({ command }) => {
+  const config = {
+    plugins: [react(), basicSsl(), protobufPlugin()],
+    server: {
+      https: {},
+    },
+    preview: {
+      https: {},
+    },
+    base: "/",
+  };
+
+  // Set base path only for production build, not for development server
+  if (command === "build") {
+    config.base = `/${repoName}/`;
+  }
+
+  return config;
 });
 
 function protobufPlugin(): Plugin {
