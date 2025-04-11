@@ -5,6 +5,7 @@ import { useSerialCommunication } from "./hooks/useSerialPort";
 import { ConfigPb, SerialRequest, StatusPb } from "../proto_out/serial";
 import DeviceStatus from "./components/DeviceStatus";
 import DeviceConfig from "./components/DeviceConfig";
+import FirmwareUpdate from "./components/FirmwareUpdate";
 
 function App() {
   const [selectedPort, setSelectedPort] = useState<SerialPort | null>(null);
@@ -123,6 +124,18 @@ function App() {
         ) : null}
         {selectedPort !== null && (
           <button onClick={sendInitialRequest}>Refresh</button>
+        )}
+      </div>
+      <div className="actions-column">
+        {/* Show Firmware Update component when connected */}
+        {/* Pass the selectedPort to the FirmwareUpdate component */}
+        {portConnected && <FirmwareUpdate selectedPort={selectedPort} />}
+
+        {/* Refresh Button */}
+        {portConnected && (
+          <button onClick={sendInitialRequest} className="refresh-button">
+            Refresh Data
+          </button>
         )}
       </div>
     </div>
