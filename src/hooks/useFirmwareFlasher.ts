@@ -8,6 +8,10 @@ interface FirmwareFlasherResult {
   startFlashing: (firmwareData: ArrayBuffer) => Promise<void>;
 }
 
+const BOOTLOADER_ACK = 0x79;
+const BOOTLOADER_NACK = 0x1f;
+const BOOTLOADER_PRODUCT_ID = 0x417;
+
 /**
  * Writes data to the serial port and reads back the response.
  * Assumes the caller manages acquiring/releasing the reader/writer locks.
@@ -48,7 +52,7 @@ async function writeAndReadSerial(
       // If we've received an ACK, we're probably done.
       if (
         receivedData.length > 0 &&
-        receivedData[receivedData.length - 1] === 0x79
+        receivedData[receivedData.length - 1] === BOOTLOADER_ACK
       ) {
         break;
       }
@@ -105,6 +109,89 @@ export function useFirmwareFlasher(
   const bootloaderCommandWriteMemory = createCommand(0x31);
   const bootloaderCommandErase = createCommand(0x43);
 
+  async function getProductId(
+    writer: WritableStreamDefaultWriter<Uint8Array>,
+    reader: ReadableStreamDefaultReader<Uint8Array>
+  ): Promise<{ id: number | null; error: string | null }> {
+    const { data, error } = await writeAndReadSerial(
+      writer,
+      reader,
+      bootloaderCommandGetId
+    );
+    if (error) {
+      return { id: null, error: error };
+    }
+    if (!data || data.length === 0) {
+      return { id: null, error: "Got no data when getting chip product ID" };
+    }
+    if (data.length !== 5) {
+      console.error(
+        `Got incorrect number of bytes for GetId. Expected 5, got ${data.length}: ${data}`
+      );
+      return { id: null, error: "Got incorrect number of bytes for GetId" };
+    }
+    if (data[4] !== BOOTLOADER_ACK) {
+      const errorMessage = "GetId response did not end with ACK";
+      console.error(errorMessage, data);
+      return { id: null, error: errorMessage };
+    }
+
+    const id = (data[2] << 8) | data[3];
+    return { id, error: null };
+  }
+
+  async function eraseAllFlash(
+    writer: WritableStreamDefaultWriter<Uint8Array>,
+    reader: ReadableStreamDefaultReader<Uint8Array>
+  ): Promise<string | null> {
+    // Flow is: write erase command, wait for ACK, write number of pages to be erased + checksum.
+    const { data: commandData, error: commandError } = await writeAndReadSerial(
+      writer,
+      reader,
+      bootloaderCommandErase
+    );
+    if (commandError) {
+      return commandError;
+    }
+    if (!commandData || commandData.length === 0) {
+      return "Got no response when erasing flash";
+    }
+    if (commandData.length !== 1) {
+      console.error(
+        `Got incorrect number of bytes for erase. Expected 1, got ${commandData.length}: ${commandData}`
+      );
+      return "Got incorrect number of bytes for erase command";
+    }
+    if (commandData[0] !== BOOTLOADER_ACK) {
+      const errorMessage = "Erase command not ACKed";
+      console.error(errorMessage, commandData);
+      return errorMessage;
+    }
+
+    const { data: numPagesData, error: numPagesError } =
+      await writeAndReadSerial(
+        writer,
+        reader,
+        // All pages
+        new Uint8Array([0xff, 0x00]),
+        10000,
+      );
+    if (numPagesError) {
+      return commandError;
+    }
+    if (!numPagesData || numPagesData.length === 0) {
+      return "Got no response when erasing flash";
+    }
+    if (numPagesData.length !== 1) {
+      console.error(
+        `Got incorrect number of bytes for erase. Expected 1, got ${numPagesData.length}: ${numPagesData}`
+      );
+      return "Got incorrect number of bytes for erase command";
+    }
+
+    return null;
+  }
+
   const startFlashing = useCallback(
     async (firmwareData: ArrayBuffer) => {
       if (!port) {
@@ -157,44 +244,49 @@ export function useFirmwareFlasher(
           await writeAndReadSerial(writer, reader, bootloaderInit);
 
         if (initError) {
-          throw new Error(`Bootloader init failed: ${initError}`);
+          setFlashError(`Bootloader init failed: ${initError}`);
+          return;
         }
         if (!bootloaderInitResponse || bootloaderInitResponse.length === 0) {
-          throw new Error("No response from bootloader initialization.");
+          setFlashError("No response from bootloader initialization.");
+          return;
         }
 
-        // Check the actual response byte(s) - typically 0x79 (ACK) or 0x1F (NACK)
-        const ack = 0x79;
-        // const nack = 0x1F; // Correct NACK value per AN2606
-        if (bootloaderInitResponse[0] !== ack) {
+        if (bootloaderInitResponse[0] !== BOOTLOADER_ACK) {
           const responseHex = Array.from(bootloaderInitResponse)
             .map((byte) => byte.toString(16).toUpperCase().padStart(2, "0"))
             .join(" ");
-          throw new Error(`Bootloader did not ACK. Received: ${responseHex}`);
+          setFlashError(`Bootloader did not ACK. Received: ${responseHex}`);
+          return;
         }
 
         console.log("Bootloader ACK received.");
         setFlashStatus("Bootloader acknowledged.");
         await new Promise((resolve) => setTimeout(resolve, 50));
 
-        const { data, error } = await writeAndReadSerial(
+        const { id: productId, error: productIdError } = await getProductId(
           writer,
-          reader,
-          bootloaderCommandGet,
-          1000
+          reader
         );
-        if (error) {
-          throw new Error(`Error while getting bootloader info: ${error}`);
+        if (productIdError) {
+          setFlashError(`Error while getting product ID: ${productIdError}`);
+          return;
         }
-        if (!data || data.length === 0) {
-          throw new Error("Got no data when getting chip product ID");
+        if (productId !== BOOTLOADER_PRODUCT_ID) {
+          setFlashError(
+            `Got incorrect product ID: ${productId} instead of ${BOOTLOADER_PRODUCT_ID}`
+          );
+          return;
         }
-        console.log(
-          "Chip product ID: ",
-          Array.from(data)
-            .map((byte) => byte.toString(16).toUpperCase().padStart(2, "0"))
-            .join(" ")
-        );
+        setFlashStatus("Confirmed chip product ID");
+
+        // setFlashStatus("Erasing flash...");
+        // const eraseError = await eraseAllFlash(writer, reader);
+        // if (eraseError) {
+        //   setFlashError(`Error while erasing flash: ${eraseError}`);
+        //   return;
+        // }
+        // setFlashStatus("Erased flash");
 
         // --- Placeholder for actual flashing logic ---
         // This part would involve sending commands like GetID, Erase, Write Memory, Go
