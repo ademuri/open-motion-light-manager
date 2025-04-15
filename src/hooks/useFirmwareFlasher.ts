@@ -23,15 +23,15 @@ async function readSerial(
     const startTime = Date.now();
     let receivedData = new Uint8Array(0);
 
-    console.log("Beginning read loop");
+    // console.log("Beginning read loop");
     do {
       const { value, done } = await reader.read();
-      if (value) {
-        console.log("Read", value);
-      }
+      // if (value) {
+      //   console.log("Read", value);
+      // }
 
       if (done) {
-        console.log("Serial done");
+        // console.log("Serial done");
         break;
       }
 
@@ -58,7 +58,7 @@ async function readSerial(
 
     return { data: receivedData, error: null };
   } catch (e) {
-    console.log("Error while reading from serial", e);
+    console.error("Error while reading from serial", e);
     return { data: null, error: String(e) };
   }
 }
@@ -82,13 +82,11 @@ async function writeAndReadSerial(
   readLoop: boolean = true
 ): Promise<{ data: Uint8Array | null; error: string | null }> {
   try {
-    console.log("Writing data", dataToWrite);
     await writer.write(dataToWrite);
-    console.log("Wrote data");
 
     return readSerial(reader, timeout, readLoop);
   } catch (e) {
-    console.log("Communication error", e);
+    console.error("Communication error", e);
     let errorMessage;
     if (e instanceof Error) {
       errorMessage = `Communication error: ${e.message}`;
@@ -237,7 +235,6 @@ export function useFirmwareFlasher(
       100,
       false
     );
-    console.log("Wrote write unprotect command");
     if (commandError) {
       return commandError;
     }
@@ -286,7 +283,6 @@ export function useFirmwareFlasher(
     writer: WritableStreamDefaultWriter<Uint8Array>,
     reader: ReadableStreamDefaultReader<Uint8Array>
   ): Promise<string | null> {
-    console.log("begin eraseAllFlash");
     // Flow is: write erase command, wait for ACK, write number of pages to be erased + checksum.
     const { data: commandData, error: commandError } = await writeAndReadSerial(
       writer,
@@ -295,7 +291,6 @@ export function useFirmwareFlasher(
       100,
       false
     );
-    console.log("Wrote erase command");
     if (commandError) {
       return commandError;
     }
@@ -315,20 +310,22 @@ export function useFirmwareFlasher(
     }
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    console.log("Writing all pages to be erased");
-    const numPages = Math.ceil(PROGRAM_FLASH_SIZE / FLASH_PAGE_SIZE);
-    let pageData = new Uint8Array([numPages, numPages ^ 0xff]);
+    // Note: "0" means 1 page
+    const numPages = Math.ceil(PROGRAM_FLASH_SIZE / FLASH_PAGE_SIZE) - 1;
+    const pageData = [numPages >> 8, numPages];
+    for (let n = 0; n <= numPages; n++) {
+      pageData.push(n >> 8, n);
+    }
     
     const { data: numPagesData, error: numPagesError } =
       await writeAndReadSerial(
         writer,
         reader,
         // All pages
-        appendChecksum(new Uint8Array([0, 0, 0, 0])),
+        appendChecksum(new Uint8Array(pageData)),
         10000,
         false
       );
-    console.log("Got response");
     if (numPagesError) {
       return commandError;
     }
@@ -342,10 +339,9 @@ export function useFirmwareFlasher(
       return "Got incorrect number of bytes for erase command";
     }
     if (numPagesData[0] != BOOTLOADER_ACK) {
-      console.log("Erase command not ACKed", numPagesData[0].toString(16));
+      console.error("Erase command not ACKed", numPagesData[0].toString(16));
       return "Erase command not ACKed";
     }
-    console.log("eraseAllPages success");
 
     return null;
   }
