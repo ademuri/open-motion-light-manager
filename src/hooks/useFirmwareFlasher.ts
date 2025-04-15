@@ -11,95 +11,64 @@ interface FirmwareFlasherResult {
 /**
  * Writes data to the serial port and reads back the response.
  * Assumes the caller manages acquiring/releasing the reader/writer locks.
- * Reads data until a timeout occurs after the last received byte, indicating the end of the response.
+ * Reads data until a timeout occurs or the reader indicates done and the last byte is an ACK.
  *
  * @param writer The WritableStreamDefaultWriter for the serial port.
  * @param reader The ReadableStreamDefaultReader for the serial port.
  * @param dataToWrite The Uint8Array data to send.
- * @param interByteTimeoutMs The maximum time allowed between received bytes/chunks before considering the response complete.
+ * @param timeout The maximum time allowed for the whole operation.
  * @returns A promise resolving to an object containing the received data or an error message.
  */
 async function writeAndReadSerial(
   writer: WritableStreamDefaultWriter<Uint8Array>,
   reader: ReadableStreamDefaultReader<Uint8Array>,
   dataToWrite: Uint8Array,
-  interByteTimeoutMs: number = 1000 // Default timeout between bytes/chunks
+  timeout: number = 100 // Default timeout
 ): Promise<{ data: Uint8Array | null; error: string | null }> {
-  let receivedData = new Uint8Array(0);
-  let error: string | null = null;
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  let resolveReadLoop: () => void = () => {}; // Initialize with a no-op function
-
-  // Promise to signal completion of the read loop (either by timeout or stream closing)
-  const readLoopComplete = new Promise<void>((resolve) => {
-    resolveReadLoop = resolve;
-  });
-
-  const resetTimeout = () => {
-    if (timeoutId) clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => {
-      // console.log(`Read timeout after ${interByteTimeoutMs}ms`); // Debug log
-      resolveReadLoop(); // Signal completion due to timeout
-    }, interByteTimeoutMs);
-  };
-
   try {
-    // --- Writing ---
     await writer.write(dataToWrite);
-    console.log("Data written:", dataToWrite); // Debug log
-    await new Promise((resolve) => setTimeout(resolve, 10));
 
-    // --- Reading ---
-    // Start the read loop asynchronously
-    const readLoopPromise = (async () => {
-      resetTimeout(); // Start the first timeout immediately after writing
-      while (true) {
-        try {
-          const { value, done } = await reader.read();
+    const startTime = Date.now();
+    let receivedData = new Uint8Array(0);
 
-          if (done && receivedData.length !== 0) {
-            console.log("Reader stream closed."); // Debug log
-            resolveReadLoop(); // Stream closed, reading is done
-            break;
-          }
+    while (Date.now() - startTime < timeout) {
+      const { value, done } = await reader.read();
 
-          if (value) {
-            // console.log("Received chunk:", value); // Debug log
-            const newData = new Uint8Array(receivedData.length + value.length);
-            newData.set(receivedData, 0);
-            newData.set(value, receivedData.length);
-            receivedData = newData;
-            resetTimeout(); // Reset timeout because we received data
-          }
-          // If value is null/empty, loop continues waiting for next read()
-        } catch (readError) {
-          // console.error("Error during reader.read():", readError); // Debug log
-          error = `Read error: ${readError}`;
-          resolveReadLoop(); // Error occurred, reading is done
-          break;
-        }
+      if (done) {
+        break;
       }
-    })();
 
-    // Wait for the read loop to complete (timeout or stream close/error)
-    await readLoopComplete;
-  } catch (writeError) {
-    // console.error("Error during writer.write():", writeError); // Debug log
-    error = `Write error: ${writeError}`;
-  } finally {
-    // Clear any pending timeout
-    if (timeoutId) clearTimeout(timeoutId);
-    // IMPORTANT: Do NOT release locks here. The caller is responsible.
-  }
+      if (value && value.length > 0) {
+        const newData = new Uint8Array(receivedData.length + value.length);
+        newData.set(receivedData, 0);
+        newData.set(value, receivedData.length);
+        receivedData = newData;
+      }
 
-  console.log("Final received data:", receivedData); // Debug log
-  console.log("Final error:", error); // Debug log
+      // If we've received an ACK, we're probably done.
+      if (
+        receivedData.length > 0 &&
+        receivedData[receivedData.length - 1] === 0x79
+      ) {
+        break;
+      }
+    }
 
-  if (error) {
-    return { data: null, error: error };
-  } else {
-    // Return received data (can be empty if nothing was received but no error occurred)
+    if (receivedData.length === 0) {
+      return { data: null, error: "No data received within timeout" };
+    }
+
     return { data: receivedData, error: null };
+  } catch (e) {
+    console.log("Communication error", e);
+    let errorMessage;
+    if (e instanceof Error) {
+      errorMessage = `Communication error: ${e.message}`;
+    } else {
+      // Handle cases where 'e' might not be an Error object (e.g., a string)
+      errorMessage = `Communication error: ${String(e)}`;
+    }
+    return { data: null, error: errorMessage };
   }
 }
 
@@ -172,17 +141,17 @@ export function useFirmwareFlasher(
           dataTerminalReady: false,
           requestToSend: false,
         });
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 10));
         await port.setSignals({
           dataTerminalReady: false,
           requestToSend: true,
         });
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 10));
         await port.setSignals({
           dataTerminalReady: false,
           requestToSend: false,
         });
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
         const { data: bootloaderInitResponse, error: initError } =
           await writeAndReadSerial(writer, reader, bootloaderInit);

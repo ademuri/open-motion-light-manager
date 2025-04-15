@@ -90,16 +90,17 @@ function FirmwareUpdate({ selectedPort }: FirmwareUpdateProps) {
     }
     setLoadError(null);
 
-    if (!selectedPort.writable) {
-      await selectedPort.open({
-        baudRate: 115200,
-        bufferSize: 1000,
-        parity: "even",
-        dataBits: 8,
-        stopBits: 1,
-        flowControl: "none",
-      });
+    if (selectedPort.readable || selectedPort.writable) {
+      await selectedPort.close();
     }
+    await selectedPort.open({
+      baudRate: 115200,
+      bufferSize: 1000,
+      parity: "even",
+      dataBits: 8,
+      stopBits: 1,
+      flowControl: "none",
+    });
     await startFlashing(firmwareData);
   };
 
