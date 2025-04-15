@@ -1,6 +1,8 @@
 import { readSerial, writeAndReadSerial } from "./serialCommunication";
 import { BOOTLOADER_PROTOCOL, CHIP_PARAMETERS, COMMANDS } from "./constants";
 
+// See AN3155: https://www.st.com/resource/en/application_note/an3155-usart-protocol-used-in-the-stm32-bootloader-stmicroelectronics.pdf
+
 function appendChecksum(data: Uint8Array): Uint8Array {
   let checksum = 0;
   for (let i = 0; i < data.length; i++) {
@@ -10,6 +12,41 @@ function appendChecksum(data: Uint8Array): Uint8Array {
   result.set(data, 0);
   result.set([checksum], data.length);
   return result;
+}
+
+async function writeAndExpectAck(
+  writer: WritableStreamDefaultWriter<Uint8Array>,
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  dataToWrite: Uint8Array
+): Promise<string | null> {
+  const { data: commandData, error: commandError } = await writeAndReadSerial(
+    writer,
+    reader,
+    dataToWrite,
+    100,
+    false
+  );
+  if (commandError) {
+    return commandError;
+  }
+  if (!commandData || commandData.length === 0) {
+    return "Got no response when writing flash";
+  }
+  if (commandData.length !== 1) {
+    console.error(
+      `Got incorrect number of bytes. Expected 1, got ${commandData.length}:`,
+      dataToWrite,
+      commandData
+    );
+    return "Got incorrect number of bytes";
+  }
+  if (commandData[0] !== BOOTLOADER_PROTOCOL.ACK) {
+    const errorMessage = "Command not ACKed";
+    console.error(errorMessage, dataToWrite, commandData);
+    return errorMessage;
+  }
+
+  return null;
 }
 
 export async function initBootloader(
@@ -111,29 +148,13 @@ export async function writeUnprotectAll(
   writer: WritableStreamDefaultWriter<Uint8Array>,
   reader: ReadableStreamDefaultReader<Uint8Array>
 ): Promise<string | null> {
-  const { data: commandData, error: commandError } = await writeAndReadSerial(
+  const error = await writeAndExpectAck(
     writer,
     reader,
-    COMMANDS.WRITE_UNPROTECT,
-    100,
-    false
+    COMMANDS.WRITE_UNPROTECT
   );
-  if (commandError) {
-    return commandError;
-  }
-  if (!commandData || commandData.length === 0) {
-    return "Got no response when write unprotecting flash";
-  }
-  if (commandData.length !== 1) {
-    console.error(
-      `Got incorrect number of bytes for write unprotect. Expected 1, got ${commandData.length}: ${commandData}`
-    );
-    return "Got incorrect number of bytes for write unprotect command";
-  }
-  if (commandData[0] !== BOOTLOADER_PROTOCOL.ACK) {
-    const errorMessage = "Write unprotect command not ACKed";
-    console.error(errorMessage, commandData);
-    return errorMessage;
+  if (error) {
+    return `Error while issuing write unprotect: ${error}`;
   }
 
   const { data: ackData, error: ackError } = await readSerial(
@@ -167,29 +188,9 @@ export async function eraseAllFlash(
   reader: ReadableStreamDefaultReader<Uint8Array>
 ): Promise<string | null> {
   // Flow is: write erase command, wait for ACK, write number of pages to be erased + checksum.
-  const { data: commandData, error: commandError } = await writeAndReadSerial(
-    writer,
-    reader,
-    COMMANDS.ERASE_EXTENDED,
-    100,
-    false
-  );
-  if (commandError) {
-    return commandError;
-  }
-  if (!commandData || commandData.length === 0) {
-    return "Got no response when erasing flash";
-  }
-  if (commandData.length !== 1) {
-    console.error(
-      `Got incorrect number of bytes for erase. Expected 1, got ${commandData.length}: ${commandData}`
-    );
-    return "Got incorrect number of bytes for erase command";
-  }
-  if (commandData[0] !== BOOTLOADER_PROTOCOL.ACK) {
-    const errorMessage = "Erase command not ACKed";
-    console.error(errorMessage, commandData);
-    return errorMessage;
+  let error = await writeAndExpectAck(writer, reader, COMMANDS.ERASE_EXTENDED);
+  if (error) {
+    return `Error while issuing erase: ${error}`;
   }
   await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -203,29 +204,14 @@ export async function eraseAllFlash(
     pageData.push(n >> 8, n);
   }
 
-  const { data: numPagesData, error: numPagesError } = await writeAndReadSerial(
+  error = await writeAndExpectAck(
     writer,
     reader,
     // All pages
-    appendChecksum(new Uint8Array(pageData)),
-    10000,
-    false
+    appendChecksum(new Uint8Array(pageData))
   );
-  if (numPagesError) {
-    return commandError;
-  }
-  if (!numPagesData || numPagesData.length === 0) {
-    return "Got no response when erasing flash";
-  }
-  if (numPagesData.length !== 1) {
-    console.error(
-      `Got incorrect number of bytes for erase. Expected 1, got ${numPagesData.length}: ${numPagesData}`
-    );
-    return "Got incorrect number of bytes for erase command";
-  }
-  if (numPagesData[0] != BOOTLOADER_PROTOCOL.ACK) {
-    console.error("Erase command not ACKed", numPagesData[0].toString(16));
-    return "Erase command not ACKed";
+  if (error) {
+    return `Error while setting number of pages to erase: ${error}`;
   }
 
   return null;

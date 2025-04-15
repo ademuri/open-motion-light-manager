@@ -135,27 +135,6 @@ export function useFirmwareFlasher(
         }
         setFlashStatus("Erased flash");
 
-        // --- Placeholder for actual flashing logic ---
-        // This part would involve sending commands like GetID, Erase, Write Memory, Go
-        // Each step would likely use writeAndReadSerial again, checking responses.
-        // Example (conceptual):
-        // const getIdCommand = ...;
-        // const { data: idResponse, error: idError } = await writeAndReadSerial(writer, reader, getIdCommand);
-        // ... process idResponse ...
-        // const eraseCommand = ...;
-        // const { data: eraseResponse, error: eraseError } = await writeAndReadSerial(writer, reader, eraseCommand);
-        // ... process eraseResponse ...
-        // ... loop for writing firmwareData in chunks using writer.write() and checking ACK ...
-        // const goCommand = ...;
-        // await writer.write(goCommand); // Go command might not have a response to read
-
-        // --- End Placeholder ---
-
-        // Simulate successful flashing process for now
-        // await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate work
-        // setFlashStatus("Firmware flash successful!");
-        // setProgress(100);
-
         // Finally, clear Boot0 and reset to start the application
         // await port.setSignals({ dataTerminalReady: true, requestToSend: true });
         // await new Promise((resolve) => setTimeout(resolve, 50)); // Short delay
