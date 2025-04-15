@@ -2,7 +2,9 @@ import { useState, useCallback } from "react";
 import {
   readSerial,
   writeAndReadSerial,
-} from "../services/bootloader/serialCommunication";
+  initBootloader,
+  getProductId,
+} from "../services/bootloader";
 
 interface FirmwareFlasherResult {
   isFlashing: boolean;
@@ -25,9 +27,6 @@ export function useFirmwareFlasher(
   const [flashStatus, setFlashStatus] = useState<string | null>(null);
   const [flashError, setFlashError] = useState<string | null>(null);
 
-  // Per AN2606
-  const bootloaderInit = new Uint8Array([0x7f]);
-
   function appendChecksum(data: Uint8Array): Uint8Array {
     let checksum = 0;
     for (let i = 0; i < data.length; i++) {
@@ -43,38 +42,9 @@ export function useFirmwareFlasher(
     return new Uint8Array([command, command ^ 0xff]);
   }
 
-  const bootloaderCommandGet = createCommand(0x0);
   const bootloaderCommandGetVersion = createCommand(0x1);
-  const bootloaderCommandGetId = createCommand(0x2);
-  const bootloaderCommandReadMemory = createCommand(0x11);
-  const bootloaderCommandWriteMemory = createCommand(0x31);
-  const bootloaderCommandErase = createCommand(0x43);
   const bootloaderCommandEraseExtended = createCommand(0x44);
   const bootloaderCommandWriteUnprotect = createCommand(0x73);
-
-  async function initBootloader(
-    writer: WritableStreamDefaultWriter<Uint8Array>,
-    reader: ReadableStreamDefaultReader<Uint8Array>
-  ): Promise<string | null> {
-    const { data: bootloaderInitResponse, error: initError } =
-      await writeAndReadSerial(writer, reader, bootloaderInit);
-
-    if (initError) {
-      return `Bootloader init failed: ${initError}`;
-    }
-    if (!bootloaderInitResponse || bootloaderInitResponse.length === 0) {
-      return "No response from bootloader initialization.";
-    }
-
-    if (bootloaderInitResponse[0] !== BOOTLOADER_ACK) {
-      const responseHex = Array.from(bootloaderInitResponse)
-        .map((byte) => byte.toString(16).toUpperCase().padStart(2, "0"))
-        .join(" ");
-      return `Bootloader did not ACK. Received: ${responseHex}`;
-    }
-
-    return null;
-  }
 
   async function getVersion(
     writer: WritableStreamDefaultWriter<Uint8Array>,
@@ -110,37 +80,6 @@ export function useFirmwareFlasher(
     }
 
     return { version: data[1], error: null };
-  }
-
-  async function getProductId(
-    writer: WritableStreamDefaultWriter<Uint8Array>,
-    reader: ReadableStreamDefaultReader<Uint8Array>
-  ): Promise<{ id: number | null; error: string | null }> {
-    const { data, error } = await writeAndReadSerial(
-      writer,
-      reader,
-      bootloaderCommandGetId
-    );
-    if (error) {
-      return { id: null, error: error };
-    }
-    if (!data || data.length === 0) {
-      return { id: null, error: "Got no data when getting chip product ID" };
-    }
-    if (data.length !== 5) {
-      console.error(
-        `Got incorrect number of bytes for GetId. Expected 5, got ${data.length}: ${data}`
-      );
-      return { id: null, error: "Got incorrect number of bytes for GetId" };
-    }
-    if (data[4] !== BOOTLOADER_ACK) {
-      const errorMessage = "GetId response did not end with ACK";
-      console.error(errorMessage, data);
-      return { id: null, error: errorMessage };
-    }
-
-    const id = (data[2] << 8) | data[3];
-    return { id, error: null };
   }
 
   async function writeUnprotectAll(
