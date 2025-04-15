@@ -11,6 +11,57 @@ interface FirmwareFlasherResult {
 const BOOTLOADER_ACK = 0x79;
 const BOOTLOADER_NACK = 0x1f;
 const BOOTLOADER_PRODUCT_ID = 0x417;
+const FLASH_PAGE_SIZE = 1024;
+const PROGRAM_FLASH_SIZE = 65536;
+
+async function readSerial(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  timeout: number = 100, // Default timeout
+  loop: boolean = false
+): Promise<{ data: Uint8Array | null; error: string | null }> {
+  try {
+    const startTime = Date.now();
+    let receivedData = new Uint8Array(0);
+
+    console.log("Beginning read loop");
+    do {
+      const { value, done } = await reader.read();
+      if (value) {
+        console.log("Read", value);
+      }
+
+      if (done) {
+        console.log("Serial done");
+        break;
+      }
+
+      if (value && value.length > 0) {
+        const newData = new Uint8Array(receivedData.length + value.length);
+        newData.set(receivedData, 0);
+        newData.set(value, receivedData.length);
+        receivedData = newData;
+      }
+
+      // If we've received an ACK, we're probably done.
+      if (
+        receivedData.length > 0 &&
+        (receivedData[receivedData.length - 1] === BOOTLOADER_ACK ||
+          receivedData[receivedData.length - 1] === BOOTLOADER_NACK)
+      ) {
+        break;
+      }
+    } while (loop && Date.now() - startTime < timeout);
+
+    if (receivedData.length === 0) {
+      return { data: null, error: "No data received within timeout" };
+    }
+
+    return { data: receivedData, error: null };
+  } catch (e) {
+    console.log("Error while reading from serial", e);
+    return { data: null, error: String(e) };
+  }
+}
 
 /**
  * Writes data to the serial port and reads back the response.
@@ -27,42 +78,15 @@ async function writeAndReadSerial(
   writer: WritableStreamDefaultWriter<Uint8Array>,
   reader: ReadableStreamDefaultReader<Uint8Array>,
   dataToWrite: Uint8Array,
-  timeout: number = 100 // Default timeout
+  timeout: number = 100, // Default timeout
+  readLoop: boolean = true
 ): Promise<{ data: Uint8Array | null; error: string | null }> {
   try {
+    console.log("Writing data", dataToWrite);
     await writer.write(dataToWrite);
+    console.log("Wrote data");
 
-    const startTime = Date.now();
-    let receivedData = new Uint8Array(0);
-
-    while (Date.now() - startTime < timeout) {
-      const { value, done } = await reader.read();
-
-      if (done) {
-        break;
-      }
-
-      if (value && value.length > 0) {
-        const newData = new Uint8Array(receivedData.length + value.length);
-        newData.set(receivedData, 0);
-        newData.set(value, receivedData.length);
-        receivedData = newData;
-      }
-
-      // If we've received an ACK, we're probably done.
-      if (
-        receivedData.length > 0 &&
-        receivedData[receivedData.length - 1] === BOOTLOADER_ACK
-      ) {
-        break;
-      }
-    }
-
-    if (receivedData.length === 0) {
-      return { data: null, error: "No data received within timeout" };
-    }
-
-    return { data: receivedData, error: null };
+    return readSerial(reader, timeout, readLoop);
   } catch (e) {
     console.log("Communication error", e);
     let errorMessage;
@@ -108,6 +132,68 @@ export function useFirmwareFlasher(
   const bootloaderCommandReadMemory = createCommand(0x11);
   const bootloaderCommandWriteMemory = createCommand(0x31);
   const bootloaderCommandErase = createCommand(0x43);
+  const bootloaderCommandEraseExtended = createCommand(0x44);
+  const bootloaderCommandWriteUnprotect = createCommand(0x73);
+
+  async function initBootloader(
+    writer: WritableStreamDefaultWriter<Uint8Array>,
+    reader: ReadableStreamDefaultReader<Uint8Array>
+  ): Promise<string | null> {
+    const { data: bootloaderInitResponse, error: initError } =
+      await writeAndReadSerial(writer, reader, bootloaderInit);
+
+    if (initError) {
+      return `Bootloader init failed: ${initError}`;
+    }
+    if (!bootloaderInitResponse || bootloaderInitResponse.length === 0) {
+      return "No response from bootloader initialization.";
+    }
+
+    if (bootloaderInitResponse[0] !== BOOTLOADER_ACK) {
+      const responseHex = Array.from(bootloaderInitResponse)
+        .map((byte) => byte.toString(16).toUpperCase().padStart(2, "0"))
+        .join(" ");
+      return `Bootloader did not ACK. Received: ${responseHex}`;
+    }
+
+    return null;
+  }
+
+  async function getVersion(
+    writer: WritableStreamDefaultWriter<Uint8Array>,
+    reader: ReadableStreamDefaultReader<Uint8Array>
+  ): Promise<{ version: number | null; error: string | null }> {
+    const { data, error } = await writeAndReadSerial(
+      writer,
+      reader,
+      bootloaderCommandGetVersion
+    );
+    if (error) {
+      return { version: null, error: error };
+    }
+    if (!data || data.length === 0) {
+      return {
+        version: null,
+        error: "Got no data when getting chip product version",
+      };
+    }
+    if (data.length !== 5) {
+      console.error(
+        `Got incorrect number of bytes for GetVersion. Expected 5, got ${data.length}: ${data}`
+      );
+      return {
+        version: null,
+        error: "Got incorrect number of bytes for GetVersion",
+      };
+    }
+    if (data[4] !== BOOTLOADER_ACK) {
+      const errorMessage = "GetVersion response did not end with ACK";
+      console.error(errorMessage, data);
+      return { version: null, error: errorMessage };
+    }
+
+    return { version: data[1], error: null };
+  }
 
   async function getProductId(
     writer: WritableStreamDefaultWriter<Uint8Array>,
@@ -140,16 +226,76 @@ export function useFirmwareFlasher(
     return { id, error: null };
   }
 
+  async function writeUnprotectAll(
+    writer: WritableStreamDefaultWriter<Uint8Array>,
+    reader: ReadableStreamDefaultReader<Uint8Array>
+  ): Promise<string | null> {
+    const { data: commandData, error: commandError } = await writeAndReadSerial(
+      writer,
+      reader,
+      bootloaderCommandWriteUnprotect,
+      100,
+      false
+    );
+    console.log("Wrote write unprotect command");
+    if (commandError) {
+      return commandError;
+    }
+    if (!commandData || commandData.length === 0) {
+      return "Got no response when write unprotecting flash";
+    }
+    if (commandData.length !== 1) {
+      console.error(
+        `Got incorrect number of bytes for write unprotect. Expected 1, got ${commandData.length}: ${commandData}`
+      );
+      return "Got incorrect number of bytes for write unprotect command";
+    }
+    if (commandData[0] !== BOOTLOADER_ACK) {
+      const errorMessage = "Write unprotect command not ACKed";
+      console.error(errorMessage, commandData);
+      return errorMessage;
+    }
+
+    const { data: ackData, error: ackError } = await readSerial(
+      reader,
+      100,
+      false
+    );
+    if (ackError) {
+      return ackError;
+    }
+    if (!ackData || ackData.length === 0) {
+      return "Got no response when write unprotecting flash";
+    }
+    if (ackData.length !== 1) {
+      console.error(
+        `Got incorrect number of bytes for write unprotect. Expected 1, got ${ackData.length}: ${ackData}`
+      );
+      return "Got incorrect number of bytes for write unprotect ack";
+    }
+    if (ackData[0] !== BOOTLOADER_ACK) {
+      const errorMessage = "Write unprotect ack not ACKed";
+      console.error(errorMessage, ackData);
+      return errorMessage;
+    }
+
+    return null;
+  }
+
   async function eraseAllFlash(
     writer: WritableStreamDefaultWriter<Uint8Array>,
     reader: ReadableStreamDefaultReader<Uint8Array>
   ): Promise<string | null> {
+    console.log("begin eraseAllFlash");
     // Flow is: write erase command, wait for ACK, write number of pages to be erased + checksum.
     const { data: commandData, error: commandError } = await writeAndReadSerial(
       writer,
       reader,
-      bootloaderCommandErase
+      bootloaderCommandEraseExtended,
+      100,
+      false
     );
+    console.log("Wrote erase command");
     if (commandError) {
       return commandError;
     }
@@ -167,15 +313,22 @@ export function useFirmwareFlasher(
       console.error(errorMessage, commandData);
       return errorMessage;
     }
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
+    console.log("Writing all pages to be erased");
+    const numPages = Math.ceil(PROGRAM_FLASH_SIZE / FLASH_PAGE_SIZE);
+    let pageData = new Uint8Array([numPages, numPages ^ 0xff]);
+    
     const { data: numPagesData, error: numPagesError } =
       await writeAndReadSerial(
         writer,
         reader,
         // All pages
-        new Uint8Array([0xff, 0x00]),
+        appendChecksum(new Uint8Array([0, 0, 0, 0])),
         10000,
+        false
       );
+    console.log("Got response");
     if (numPagesError) {
       return commandError;
     }
@@ -188,6 +341,11 @@ export function useFirmwareFlasher(
       );
       return "Got incorrect number of bytes for erase command";
     }
+    if (numPagesData[0] != BOOTLOADER_ACK) {
+      console.log("Erase command not ACKed", numPagesData[0].toString(16));
+      return "Erase command not ACKed";
+    }
+    console.log("eraseAllPages success");
 
     return null;
   }
@@ -240,23 +398,9 @@ export function useFirmwareFlasher(
         });
         await new Promise((resolve) => setTimeout(resolve, 10));
 
-        const { data: bootloaderInitResponse, error: initError } =
-          await writeAndReadSerial(writer, reader, bootloaderInit);
-
-        if (initError) {
-          setFlashError(`Bootloader init failed: ${initError}`);
-          return;
-        }
-        if (!bootloaderInitResponse || bootloaderInitResponse.length === 0) {
-          setFlashError("No response from bootloader initialization.");
-          return;
-        }
-
-        if (bootloaderInitResponse[0] !== BOOTLOADER_ACK) {
-          const responseHex = Array.from(bootloaderInitResponse)
-            .map((byte) => byte.toString(16).toUpperCase().padStart(2, "0"))
-            .join(" ");
-          setFlashError(`Bootloader did not ACK. Received: ${responseHex}`);
+        let bootloaderInitError = await initBootloader(writer, reader);
+        if (bootloaderInitError) {
+          setFlashError(bootloaderInitError);
           return;
         }
 
@@ -280,13 +424,42 @@ export function useFirmwareFlasher(
         }
         setFlashStatus("Confirmed chip product ID");
 
-        // setFlashStatus("Erasing flash...");
-        // const eraseError = await eraseAllFlash(writer, reader);
-        // if (eraseError) {
-        //   setFlashError(`Error while erasing flash: ${eraseError}`);
+        // const {version: version, error: versionError} = await getVersion(writer, reader);
+        // if (versionError) {
+        //   setFlashError(`Error while getting product ID: ${versionError}`);
         //   return;
         // }
-        // setFlashStatus("Erased flash");
+        // console.log(`Bootloader version: ${version}`);
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        setFlashStatus("Write unprotecting...");
+        const writeUnprotectError = await writeUnprotectAll(writer, reader);
+        if (writeUnprotectError) {
+          setFlashError(
+            `Error while writing unprotect: ${writeUnprotectError}`
+          );
+          return;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        bootloaderInitError = await initBootloader(writer, reader);
+        if (bootloaderInitError) {
+          setFlashError(bootloaderInitError);
+          return;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        console.log("Checking getProductId");
+        console.log(await getProductId(writer, reader));
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        setFlashStatus("Erasing flash...");
+        const eraseError = await eraseAllFlash(writer, reader);
+        if (eraseError) {
+          setFlashError(`Error while erasing flash: ${eraseError}`);
+          return;
+        }
+        setFlashStatus("Erased flash");
 
         // --- Placeholder for actual flashing logic ---
         // This part would involve sending commands like GetID, Erase, Write Memory, Go

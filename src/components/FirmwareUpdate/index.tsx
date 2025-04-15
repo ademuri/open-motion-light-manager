@@ -23,7 +23,7 @@ const availableVersions: FirmwareVersion[] = [
 
 function FirmwareUpdate({ selectedPort }: FirmwareUpdateProps) {
   const [selectedFirmwareUrl, setSelectedFirmwareUrl] = useState<string>(
-    availableVersions[0]?.url ?? ""
+    availableVersions[1]?.url ?? ""
   );
   const [firmwareData, setFirmwareData] = useState<ArrayBuffer | null>(null);
   const [isLoadingFirmware, setIsLoadingFirmware] = useState(false);
