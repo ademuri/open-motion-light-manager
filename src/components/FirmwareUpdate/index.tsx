@@ -90,13 +90,22 @@ function FirmwareUpdate({ selectedPort }: FirmwareUpdateProps) {
     }
     setLoadError(null);
 
+    if (!selectedPort.writable) {
+      await selectedPort.open({
+        baudRate: 115200,
+        bufferSize: 1000,
+        parity: "even",
+        dataBits: 8,
+        stopBits: 1,
+        flowControl: "none",
+      });
+    }
     await startFlashing(firmwareData);
   };
 
   // Determine button states
   const canSelectVersion = !isLoadingFirmware && !isFlashing;
-  const canFlash =
-    firmwareData !== null && !isFlashing && !isLoadingFirmware && selectedPort?.writable;
+  const canFlash = firmwareData !== null && !isFlashing && !isLoadingFirmware;
 
   return (
     <div className="firmware-update-container">
@@ -144,12 +153,11 @@ function FirmwareUpdate({ selectedPort }: FirmwareUpdateProps) {
       )}
 
       {/* Status/Error Messages */}
-      {flashStatus && !isFlashing && ( // Show status only when not flashing
-        <div className="firmware-update-status">{flashStatus}</div>
-      )}
-      {loadError && (
-        <div className="firmware-update-error">{loadError}</div>
-      )}
+      {flashStatus &&
+        !isFlashing && ( // Show status only when not flashing
+          <div className="firmware-update-status">{flashStatus}</div>
+        )}
+      {loadError && <div className="firmware-update-error">{loadError}</div>}
       {flashError && <div className="firmware-update-error">{flashError}</div>}
     </div>
   );

@@ -28,9 +28,9 @@ function App() {
 
     console.log("Opening port...");
     try {
-      await selectedPort.open({ baudRate: 115200, bufferSize: 1000 });
-      console.log("Connected!");
-      setPortConnected(true);
+      // await selectedPort.open({ baudRate: 115200, bufferSize: 1000, parity: "even" });
+      // console.log("Connected!");
+      // setPortConnected(true);
     } catch (error) {
       console.log("Error opening port: ", error);
     } finally {
@@ -42,16 +42,16 @@ function App() {
     openPort();
   }, [openPort]);
 
-  useEffect(() => {
-    if (selectedPort !== null && !portConnected) {
-      const intervalId = setInterval(() => {
-        console.log("Retrying port connection...");
-        openPort();
-      }, 1000);
+  // useEffect(() => {
+  //   if (selectedPort !== null && !portConnected) {
+  //     const intervalId = setInterval(() => {
+  //       console.log("Retrying port connection...");
+  //       openPort();
+  //     }, 1000);
 
-      return () => clearInterval(intervalId);
-    }
-  }, [selectedPort, portConnected, openPort]);
+  //     return () => clearInterval(intervalId);
+  //   }
+  // }, [selectedPort, portConnected, openPort]);
 
   const {
     response,
@@ -129,7 +129,7 @@ function App() {
       <div className="actions-column">
         {/* Show Firmware Update component when connected */}
         {/* Pass the selectedPort to the FirmwareUpdate component */}
-        {portConnected && <FirmwareUpdate selectedPort={selectedPort} />}
+        {<FirmwareUpdate selectedPort={selectedPort} />}
 
         {/* Refresh Button */}
         {portConnected && (
