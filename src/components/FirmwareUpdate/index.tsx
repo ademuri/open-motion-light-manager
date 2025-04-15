@@ -154,10 +154,9 @@ function FirmwareUpdate({ selectedPort }: FirmwareUpdateProps) {
       )}
 
       {/* Status/Error Messages */}
-      {flashStatus &&
-        !isFlashing && ( // Show status only when not flashing
-          <div className="firmware-update-status">{flashStatus}</div>
-        )}
+      {flashStatus && (
+        <div className="firmware-update-status">{flashStatus}</div>
+      )}
       {loadError && <div className="firmware-update-error">{loadError}</div>}
       {flashError && <div className="firmware-update-error">{flashError}</div>}
     </div>

@@ -8,6 +8,7 @@ export const CHIP_PARAMETERS = {
   PRODUCT_ID: 0x417,
   FLASH_PAGE_SIZE: 1024,
   PROGRAM_FLASH_SIZE: 65536,
+  PROGRAM_FLASH_START_ADDRESS: 0x8000000,
 };
 
 function createCommand(command: number): Uint8Array {

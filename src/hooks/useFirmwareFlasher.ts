@@ -6,6 +6,7 @@ import {
   writeUnprotectAll,
   eraseAllFlash,
   getVersion,
+  writeFlash,
 } from "../services/bootloader";
 
 interface FirmwareFlasherResult {
@@ -98,7 +99,10 @@ export function useFirmwareFlasher(
         }
         setFlashStatus("Confirmed chip product ID");
 
-        const {version: version, error: versionError} = await getVersion(writer, reader);
+        const { version: version, error: versionError } = await getVersion(
+          writer,
+          reader
+        );
         if (versionError) {
           setFlashError(`Error while getting product ID: ${versionError}`);
           return;
@@ -134,6 +138,45 @@ export function useFirmwareFlasher(
           return;
         }
         setFlashStatus("Erased flash");
+
+        setFlashStatus("Writing firmware...");
+
+        const chunkSize = 256; // Max chunk size for STM32 bootloader write command
+        let bytesWritten = 0;
+        let currentAddress = CHIP_PARAMETERS.PROGRAM_FLASH_START_ADDRESS;
+        let writeError: string | null = null;
+
+        while (bytesWritten < totalBytes) {
+          const remainingBytes = totalBytes - bytesWritten;
+          const currentChunkSize = Math.min(chunkSize, remainingBytes);
+
+          const chunk = new Uint8Array(
+            firmwareData,
+            bytesWritten,
+            currentChunkSize
+          );
+
+          // Update status before writing the chunk
+          const currentProgress =
+            Math.round(
+              ((bytesWritten + currentChunkSize / 2) / totalBytes) * 90
+            ) + 5; // Scale progress 5-95%
+          setProgress(currentProgress);
+          setFlashStatus(`Writing flash... ${currentProgress}%`);
+
+          writeError = await writeFlash(writer, reader, currentAddress, chunk);
+          if (writeError) {
+            setFlashError(
+              `Error writing flash at address ${currentAddress.toString(
+                16
+              )}: ${writeError}`
+            );
+            break;
+          }
+
+          bytesWritten += currentChunkSize;
+          currentAddress += currentChunkSize;
+        }
 
         // Finally, clear Boot0 and reset to start the application
         // await port.setSignals({ dataTerminalReady: true, requestToSend: true });

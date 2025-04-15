@@ -216,3 +216,61 @@ export async function eraseAllFlash(
 
   return null;
 }
+
+export async function writeFlash(
+  writer: WritableStreamDefaultWriter<Uint8Array>,
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  address: number,
+  data: Uint8Array
+): Promise<string | null> {
+  if (address < 0 || !Number.isInteger(address)) {
+    return `Invalid address: ${address}`;
+  }
+  if (data.length === 0) {
+    return "writeFlash called with empty data";
+  }
+  if (data.length % 4 !== 0) {
+    return `writeFlash called with invalid data length: ${data.length}; must be a multiple of 4`;
+  }
+  if (data.length > 256) {
+    return `writeFlash called with invalid data length: ${data.length}; must be <=256`;
+  }
+
+  let error = await writeAndExpectAck(writer, reader, COMMANDS.WRITE_MEMORY);
+  if (error) {
+    return `Error while issuing write: ${error}`;
+  }
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  // Now, send the start address (4 bytes) and checksum
+  const startAddress = [
+    address >> 24,
+    (address >> 16) & 0xff,
+    (address >> 8) & 0xff,
+    address & 0xff,
+  ];
+  error = await writeAndExpectAck(
+    writer,
+    reader,
+    appendChecksum(new Uint8Array(startAddress))
+  );
+  if (error) {
+    return `Error while setting write start address: ${error}`;
+  }
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  const dataWithLength = new Uint8Array(data.length + 1);
+  dataWithLength[0] = data.length - 1;
+  dataWithLength.set(data, 1);
+
+  error = await writeAndExpectAck(
+    writer,
+    reader,
+    appendChecksum(dataWithLength)
+  );
+  if (error) {
+    return `Error while writing flash: ${error}`;
+  }
+
+  return null;
+}
