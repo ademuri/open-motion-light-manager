@@ -225,7 +225,7 @@ export async function eraseAllFlash(
     Math.ceil(
       CHIP_PARAMETERS.PROGRAM_FLASH_SIZE / CHIP_PARAMETERS.FLASH_PAGE_SIZE
     ) - 1;
-  const pageData = [numPages >> 8, numPages];
+  const pageData = [numPages >> 8, numPages & 0xff];
   for (let n = 0; n <= numPages; n++) {
     pageData.push(n >> 8, n);
   }

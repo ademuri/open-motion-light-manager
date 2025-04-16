@@ -14,7 +14,11 @@ interface FirmwareUpdateProps {
 }
 
 const availableVersions: FirmwareVersion[] = [
-  { version: "Select Version...", url: "" },
+  {
+    version: "0.1.3",
+    // Relative to the `public` directory - NO leading slash
+    url: "firmware-v0.1.3.bin",
+  },
   {
     version: "0.1.2",
     // Relative to the `public` directory - NO leading slash
@@ -27,7 +31,7 @@ function FirmwareUpdate({
   onFlashComplete,
 }: FirmwareUpdateProps) {
   const [selectedFirmwareUrl, setSelectedFirmwareUrl] = useState<string>(
-    availableVersions[1]?.url ?? ""
+    availableVersions[0]?.url ?? ""
   );
   const [firmwareData, setFirmwareData] = useState<ArrayBuffer | null>(null);
   const [isLoadingFirmware, setIsLoadingFirmware] = useState(false);
