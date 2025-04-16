@@ -82,6 +82,30 @@ function DeviceConfig({
     }
   };
 
+  // Specific handler for Auto Brightness Threshold with scaling
+  const handleAutoBrightnessThresholdChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const displayValue = event.target.value;
+    // Treat empty string as 0 for the display value, which means 0 for the stored value.
+    const parsedDisplayValue = displayValue === "" ? 0 : parseInt(displayValue, 10);
+
+    if (!isNaN(parsedDisplayValue)) {
+      const storedValue = parsedDisplayValue * 4; // Scale the input value by 4 for storage
+      setLocalConfig((prevConfig) => {
+        if (prevConfig) {
+          const updatedConfig = {
+            ...prevConfig,
+            autoBrightnessThreshold: storedValue, // Store the scaled value
+          };
+          return updatedConfig;
+        }
+        return prevConfig;
+      });
+    }
+  };
+
+
   if (localConfig === null) {
     return (
       <div className="device-config-container">Loading configuration...</div>
@@ -94,9 +118,6 @@ function DeviceConfig({
   const handleProximityModeChange = (
     event: React.ChangeEvent<HTMLSelectElement>
   ) => handleSelectChange(event, "proximityMode");
-  const handleAutoBrightnessThresholdChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => handleNumberInputChange(event, "autoBrightnessThreshold");
   const handleProximityToggleTimeoutChange = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => handleNumberInputChange(event, "proximityToggleTimeoutSeconds");
@@ -116,6 +137,9 @@ function DeviceConfig({
     event: React.ChangeEvent<HTMLInputElement>
   ) =>
     handleNumberInputChange(event, "lowBatteryHysteresisThresholdMillivolts");
+
+  // Calculate the display value for auto brightness threshold
+  const displayAutoBrightnessThreshold = Math.round(localConfig.autoBrightnessThreshold / 4);
 
   return (
     <>
@@ -154,12 +178,14 @@ function DeviceConfig({
         </div>
         <div className="device-config-item">
           <span className="device-config-label">
-            Auto Brightness Threshold (1/4 Lux):
+            Auto Brightness Threshold (Lux):
           </span>
           <input
             type="number"
             min="0"
-            value={localConfig.autoBrightnessThreshold}
+            // Display the scaled-down value
+            value={displayAutoBrightnessThreshold}
+            // Use the specific handler that scales the value up on change
             onChange={handleAutoBrightnessThresholdChange}
             disabled={!editable}
           />
