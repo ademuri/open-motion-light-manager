@@ -4,7 +4,7 @@ import { useFirmwareFlasher } from "../../hooks/useFirmwareFlasher";
 
 interface FirmwareVersion {
   version: string;
-  url: string; // Relative URL to the firmware file in the public directory
+  url: string; // Relative URL to the firmware file *within* the public directory
 }
 
 interface FirmwareUpdateProps {
@@ -17,8 +17,8 @@ const availableVersions: FirmwareVersion[] = [
   { version: "Select Version...", url: "" },
   {
     version: "0.1.2",
-    // Relative to the `public` directory
-    url: "/firmware-v0.1.2.bin",
+    // Relative to the `public` directory - NO leading slash
+    url: "firmware-v0.1.2.bin",
   },
 ];
 
@@ -49,16 +49,20 @@ function FirmwareUpdate({
       setLoadError(null);
       setFirmwareData(null);
 
+      // Construct the full URL using the base path and the relative firmware path
+      // import.meta.env.BASE_URL will be '/' in dev and '/<repoName>/' in prod build
+      const fullUrl = import.meta.env.BASE_URL + selectedFirmwareUrl;
+
       try {
         console.log(
-          `Attempting to fetch local firmware from: ${selectedFirmwareUrl}`
+          `Attempting to fetch local firmware from: ${fullUrl}` // Use the constructed full URL
         );
-        // Fetch from the relative URL (served by Vite/GitHub Pages)
-        const response = await fetch(selectedFirmwareUrl);
+        // Fetch from the dynamically constructed URL
+        const response = await fetch(fullUrl); // Use the constructed full URL
 
         if (!response.ok) {
           throw new Error(
-            `Failed to load firmware: ${response.status} ${response.statusText}`
+            `Failed to load firmware: ${response.status} ${response.statusText} from ${fullUrl}`
           );
         }
 
