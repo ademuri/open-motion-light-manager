@@ -144,7 +144,7 @@ export function useFirmwareFlasher(
         console.log("getProductId:", await getProductId(writer, reader));
 
         // For debugging the verification step
-        const doWrite = false;
+        const doWrite = true;
 
         if (doWrite) {
           setFlashStatus("Erasing flash...");
