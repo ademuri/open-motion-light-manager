@@ -266,7 +266,6 @@ export async function writeFlash(
   if (error) {
     return `Error while issuing write: ${error}`;
   }
-  await new Promise((resolve) => setTimeout(resolve, 10));
 
   // Now, send the start address (4 bytes) and checksum
   const startAddress = [
@@ -283,7 +282,6 @@ export async function writeFlash(
   if (error) {
     return `Error while setting write start address: ${error}`;
   }
-  await new Promise((resolve) => setTimeout(resolve, 10));
 
   const dataWithLength = new Uint8Array(data.length + 1);
   dataWithLength[0] = data.length - 1;
@@ -330,7 +328,6 @@ export async function readFlash(
   if (error) {
     return { data: null, error: `Error while issuing read: ${error}` };
   }
-  await new Promise((resolve) => setTimeout(resolve, 10));
 
   // Send the start address (4 bytes) and checksum
   const startAddress = [
@@ -350,7 +347,6 @@ export async function readFlash(
       error: `Error while setting read start address: ${error}`,
     };
   }
-  await new Promise((resolve) => setTimeout(resolve, 10));
 
   // Send the number of bytes to be read and checksum
   const { data: data, error: readError } = await writeAndReadSerial(

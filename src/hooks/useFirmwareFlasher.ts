@@ -123,7 +123,7 @@ export function useFirmwareFlasher(
         }
         console.log(`Bootloader version: ${version}`);
 
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        // await new Promise((resolve) => setTimeout(resolve, 10));
         setFlashStatus("Write unprotecting...");
         const writeUnprotectError = await writeUnprotectAll(writer, reader);
         if (writeUnprotectError) {
@@ -141,14 +141,12 @@ export function useFirmwareFlasher(
         }
 
         await new Promise((resolve) => setTimeout(resolve, 10));
-        console.log("Checking getProductId");
-        console.log(await getProductId(writer, reader));
+        console.log("getProductId:", await getProductId(writer, reader));
 
         // For debugging the verification step
-        const doWrite = false;
+        const doWrite = true;
 
         if (doWrite) {
-          await new Promise((resolve) => setTimeout(resolve, 10));
           setFlashStatus("Erasing flash...");
           const eraseError = await eraseAllFlash(writer, reader);
           if (eraseError) {
@@ -202,8 +200,6 @@ export function useFirmwareFlasher(
         }
 
         // Re-enable write protection
-        await new Promise((resolve) => setTimeout(resolve, 10));
-        console.log("Re-enabling write protection");
         const writeProtectError = await writeProtectAll(writer, reader);
         if (writeProtectError) {
           setFlashError(
@@ -211,7 +207,6 @@ export function useFirmwareFlasher(
           );
           return;
         }
-        console.log("Re-init bootloader");
 
         // Re-enter bootloader after reset
         await new Promise((resolve) => setTimeout(resolve, 10));
@@ -220,7 +215,7 @@ export function useFirmwareFlasher(
           setFlashError(bootloaderInitError);
           return;
         }
-        console.log("Re-init bootloader done");
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
         const readChunkSize = 256; // Max chunk size for read command
         let bytesVerified = 0;
