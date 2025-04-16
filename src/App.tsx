@@ -14,6 +14,10 @@ function App() {
   const [status, setStatus] = useState<StatusPb | null>(null);
 
   const openPort = useCallback(async () => {
+    if (selectedPort === null) {
+      setPortConnected(false);
+    }
+
     if (selectedPort === null || portOpeningRef.current) {
       return;
     }
@@ -28,9 +32,9 @@ function App() {
 
     console.log("Opening port...");
     try {
-      // await selectedPort.open({ baudRate: 115200, bufferSize: 1000, parity: "even" });
-      // console.log("Connected!");
-      // setPortConnected(true);
+      await selectedPort.open({ baudRate: 115200, bufferSize: 1000 });
+      console.log("Connected!");
+      setPortConnected(true);
     } catch (error) {
       console.log("Error opening port: ", error);
     } finally {
@@ -117,7 +121,11 @@ function App() {
           <div className="error-message">{error}</div>
         ) : null}
         {response !== null && response.config != null && (
-          <DeviceConfig config={response.config} setConfig={sendConfig} />
+          <DeviceConfig
+            config={response.config}
+            setConfig={sendConfig}
+            editable={portConnected}
+          />
         )}
         {response !== null ? (
           <DeviceStatus connected={portConnected} status={status} />
@@ -130,13 +138,6 @@ function App() {
         {/* Show Firmware Update component when connected */}
         {/* Pass the selectedPort to the FirmwareUpdate component */}
         {<FirmwareUpdate selectedPort={selectedPort} />}
-
-        {/* Refresh Button */}
-        {portConnected && (
-          <button onClick={sendInitialRequest} className="refresh-button">
-            Refresh Data
-          </button>
-        )}
       </div>
     </div>
   );

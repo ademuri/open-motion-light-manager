@@ -9,9 +9,14 @@ import { useState, useEffect } from "react";
 interface DeviceConfigProps {
   config: ConfigPb | null;
   setConfig: (config: ConfigPb) => void;
+  editable?: boolean;
 }
 
-function DeviceConfig({ config, setConfig }: DeviceConfigProps) {
+function DeviceConfig({
+  config,
+  setConfig,
+  editable = true,
+}: DeviceConfigProps) {
   const [localConfig, setLocalConfig] = useState<ConfigPb | null>(null);
 
   useEffect(() => {
@@ -114,7 +119,7 @@ function DeviceConfig({ config, setConfig }: DeviceConfigProps) {
 
   return (
     <>
-      <div className="device-config-container">
+      <div className={`device-config-container ${!editable ? "readonly" : ""}`}>
         <div className="device-config-item">
           <span className="device-config-label">Version:</span>{" "}
           {localConfig.version}
@@ -124,6 +129,7 @@ function DeviceConfig({ config, setConfig }: DeviceConfigProps) {
           <select
             value={localConfig.brightnessMode}
             onChange={handleBrightnessModeChange}
+            disabled={!editable}
           >
             <option value={BrightnessMode.DISABLED}>Disabled</option>
             <option value={BrightnessMode.ON_WHEN_BELOW}>On When Below</option>
@@ -138,6 +144,7 @@ function DeviceConfig({ config, setConfig }: DeviceConfigProps) {
             min="0"
             value={localConfig.autoBrightnessThreshold}
             onChange={handleAutoBrightnessThresholdChange}
+            disabled={!editable}
           />
         </div>
         <div className="device-config-item">
@@ -145,6 +152,7 @@ function DeviceConfig({ config, setConfig }: DeviceConfigProps) {
           <select
             value={localConfig.proximityMode}
             onChange={handleProximityModeChange}
+            disabled={!editable}
           >
             <option value={ProximityMode.DISABLED}>Disabled</option>
             <option value={ProximityMode.TOGGLE}>On When Detected</option>
@@ -159,6 +167,7 @@ function DeviceConfig({ config, setConfig }: DeviceConfigProps) {
             min="0"
             value={localConfig.proximityToggleTimeoutSeconds}
             onChange={handleProximityToggleTimeoutChange}
+            disabled={!editable}
           />
         </div>
         <div className="device-config-item">
@@ -168,6 +177,7 @@ function DeviceConfig({ config, setConfig }: DeviceConfigProps) {
             min="0"
             value={localConfig.proximityThreshold}
             onChange={handleProximityThresholdChange}
+            disabled={!editable}
           />
         </div>
         <div className="device-config-item">
@@ -177,6 +187,7 @@ function DeviceConfig({ config, setConfig }: DeviceConfigProps) {
             min="0"
             value={localConfig.motionTimeoutSeconds}
             onChange={handleMotionTimeoutChange}
+            disabled={!editable}
           />
         </div>
         <div className="device-config-item">
@@ -187,6 +198,7 @@ function DeviceConfig({ config, setConfig }: DeviceConfigProps) {
             max="255"
             value={localConfig.ledDutyCycle}
             onChange={handleLedDutyCycleChange}
+            disabled={!editable}
           />
         </div>
         <div className="device-config-item">
@@ -196,6 +208,7 @@ function DeviceConfig({ config, setConfig }: DeviceConfigProps) {
             min="0"
             value={localConfig.lowBatteryCutoffMillivolts}
             onChange={handleLowBatteryCutoffChange}
+            disabled={!editable}
           />
         </div>
         <div className="device-config-item">
@@ -207,11 +220,13 @@ function DeviceConfig({ config, setConfig }: DeviceConfigProps) {
             min="0"
             value={localConfig.lowBatteryHysteresisThresholdMillivolts}
             onChange={handleLowBatteryHysteresisChange}
+            disabled={!editable}
           />
         </div>
         <button
           onClick={() => localConfig && setConfig(localConfig)}
           className="device-config-save-button"
+          disabled={!editable}
         >
           Save Configuration
         </button>

@@ -106,7 +106,11 @@ function FirmwareUpdate({ selectedPort }: FirmwareUpdateProps) {
 
   // Determine button states
   const canSelectVersion = !isLoadingFirmware && !isFlashing;
-  const canFlash = firmwareData !== null && !isFlashing && !isLoadingFirmware;
+  const canFlash =
+    firmwareData !== null &&
+    !isFlashing &&
+    !isLoadingFirmware &&
+    selectedPort !== null;
 
   return (
     <div className="firmware-update-container">
