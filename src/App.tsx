@@ -36,7 +36,7 @@ function App() {
       console.log("Connected!");
       setPortConnected(true);
     } catch (error) {
-      console.log("Error opening port: ", error);
+      console.error("Error opening port: ", error);
     } finally {
       portOpeningRef.current = false;
     }
@@ -135,9 +135,12 @@ function App() {
         )}
       </div>
       <div className="actions-column">
-        {/* Show Firmware Update component when connected */}
-        {/* Pass the selectedPort to the FirmwareUpdate component */}
-        {<FirmwareUpdate selectedPort={selectedPort} />}
+        {
+          <FirmwareUpdate
+            selectedPort={selectedPort}
+            onFlashComplete={openPort}
+          />
+        }
       </div>
     </div>
   );

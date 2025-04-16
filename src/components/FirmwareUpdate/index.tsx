@@ -9,9 +9,10 @@ interface FirmwareVersion {
 
 interface FirmwareUpdateProps {
   selectedPort: SerialPort | null;
+  /** Optional callback function triggered when flashing completes successfully. */
+  onFlashComplete?: () => void;
 }
 
-// --- Updated URLs ---
 const availableVersions: FirmwareVersion[] = [
   { version: "Select Version...", url: "" },
   {
@@ -21,7 +22,10 @@ const availableVersions: FirmwareVersion[] = [
   },
 ];
 
-function FirmwareUpdate({ selectedPort }: FirmwareUpdateProps) {
+function FirmwareUpdate({
+  selectedPort,
+  onFlashComplete,
+}: FirmwareUpdateProps) {
   const [selectedFirmwareUrl, setSelectedFirmwareUrl] = useState<string>(
     availableVersions[1]?.url ?? ""
   );
@@ -90,18 +94,30 @@ function FirmwareUpdate({ selectedPort }: FirmwareUpdateProps) {
     }
     setLoadError(null);
 
-    if (selectedPort.readable || selectedPort.writable) {
+    try {
+      if (selectedPort.readable || selectedPort.writable) {
+        await selectedPort.close();
+      }
+      await selectedPort.open({
+        baudRate: 115200,
+        bufferSize: 1000,
+        parity: "even",
+        dataBits: 8,
+        stopBits: 1,
+        flowControl: "none",
+      });
+      await startFlashing(firmwareData);
+    } catch (err) {
+      console.error("Error during port handling or starting flash:", err);
+      setLoadError(
+        `Port error: ${err instanceof Error ? err.message : String(err)}`
+      );
+    } finally {
       await selectedPort.close();
+      if (onFlashComplete) {
+        onFlashComplete();
+      }
     }
-    await selectedPort.open({
-      baudRate: 115200,
-      bufferSize: 1000,
-      parity: "even",
-      dataBits: 8,
-      stopBits: 1,
-      flowControl: "none",
-    });
-    await startFlashing(firmwareData);
   };
 
   // Determine button states
