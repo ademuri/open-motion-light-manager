@@ -9,6 +9,7 @@ export const CHIP_PARAMETERS = {
   FLASH_PAGE_SIZE: 1024,
   PROGRAM_FLASH_SIZE: 65536,
   PROGRAM_FLASH_START_ADDRESS: 0x8000000,
+  NUM_SECTORS: 65536 / 4096,
 };
 
 function createCommand(command: number): Uint8Array {
@@ -22,5 +23,6 @@ export const COMMANDS = {
   READ_MEMORY: createCommand(0x11),
   WRITE_MEMORY: createCommand(0x31),
   ERASE_EXTENDED: createCommand(0x44),
+  WRITE_PROTECT: createCommand(0x63),
   WRITE_UNPROTECT: createCommand(0x73),
 };

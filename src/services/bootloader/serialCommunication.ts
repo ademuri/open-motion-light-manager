@@ -4,7 +4,8 @@ import { BOOTLOADER_PROTOCOL } from "./constants.ts";
 export async function readSerial(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   timeout: number = 100, // Default timeout
-  loop: boolean = false
+  loop: boolean = false,
+  expectedResponseSize: number = -1,
 ): Promise<SerialResult> {
   try {
     const startTime = Date.now();
@@ -12,6 +13,7 @@ export async function readSerial(
 
     // console.log("Beginning read loop");
     do {
+      // console.log("Reading...");
       const { value, done } = await reader.read();
       // if (value) {
       //   console.log("Read", value);
@@ -32,9 +34,15 @@ export async function readSerial(
       // If we've received an ACK, we're probably done.
       if (
         receivedData.length > 0 &&
+        expectedResponseSize <= 0 &&
         (receivedData[receivedData.length - 1] === BOOTLOADER_PROTOCOL.ACK ||
           receivedData[receivedData.length - 1] === BOOTLOADER_PROTOCOL.NACK)
       ) {
+        break;
+      }
+
+      // Or, if we've received the expected amount of data, we're done.
+      if (expectedResponseSize > 0 && receivedData.length >= expectedResponseSize) {
         break;
       }
     } while (loop && Date.now() - startTime < timeout);
@@ -66,12 +74,13 @@ export async function writeAndReadSerial(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   dataToWrite: Uint8Array,
   timeout: number = 100, // Default timeout
-  readLoop: boolean = true
+  readLoop: boolean = true,
+  expectedResponseSize: number = -1,
 ): Promise<SerialResult> {
   try {
     await writer.write(dataToWrite);
 
-    return readSerial(reader, timeout, readLoop);
+    return readSerial(reader, timeout, readLoop, expectedResponseSize);
   } catch (e) {
     console.error("Communication error", e);
     let errorMessage;

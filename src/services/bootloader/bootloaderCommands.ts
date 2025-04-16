@@ -1,5 +1,6 @@
 import { readSerial, writeAndReadSerial } from "./serialCommunication";
 import { BOOTLOADER_PROTOCOL, CHIP_PARAMETERS, COMMANDS } from "./constants";
+import { SerialResult } from "./types";
 
 // See AN3155: https://www.st.com/resource/en/application_note/an3155-usart-protocol-used-in-the-stm32-bootloader-stmicroelectronics.pdf
 
@@ -148,11 +149,7 @@ export async function writeUnprotectAll(
   writer: WritableStreamDefaultWriter<Uint8Array>,
   reader: ReadableStreamDefaultReader<Uint8Array>
 ): Promise<string | null> {
-  const error = await writeAndExpectAck(
-    writer,
-    reader,
-    COMMANDS.WRITE_UNPROTECT
-  );
+  const error = await writeAndExpectAck(writer, reader, COMMANDS.WRITE_PROTECT);
   if (error) {
     return `Error while issuing write unprotect: ${error}`;
   }
@@ -178,6 +175,58 @@ export async function writeUnprotectAll(
     const errorMessage = "Write unprotect ack not ACKed";
     console.error(errorMessage, ackData);
     return errorMessage;
+  }
+
+  return null;
+}
+
+export async function writeProtectAll(
+  writer: WritableStreamDefaultWriter<Uint8Array>,
+  reader: ReadableStreamDefaultReader<Uint8Array>
+): Promise<string | null> {
+  const error = await writeAndExpectAck(
+    writer,
+    reader,
+    COMMANDS.WRITE_UNPROTECT
+  );
+  if (error) {
+    return `Error while issuing write protect: ${error}`;
+  }
+
+  const { data: ackData, error: ackError } = await readSerial(
+    reader,
+    100,
+    false
+  );
+  if (ackError) {
+    return ackError;
+  }
+  if (!ackData || ackData.length === 0) {
+    return "Got no response when write protecting flash";
+  }
+  if (ackData.length !== 1) {
+    console.error(
+      `Got incorrect number of bytes for write protect. Expected 1, got ${ackData.length}: ${ackData}`
+    );
+    return "Got incorrect number of bytes for write protect ack";
+  }
+  if (ackData[0] !== BOOTLOADER_PROTOCOL.ACK) {
+    const errorMessage = "Write protect ack not ACKed";
+    console.error(errorMessage, ackData);
+    return errorMessage;
+  }
+
+  const sectorsData = [CHIP_PARAMETERS.NUM_SECTORS];
+  for (let i = 0; i < CHIP_PARAMETERS.NUM_SECTORS; i++) {
+    sectorsData.push(i);
+  }
+  const sectorsError = await writeAndExpectAck(
+    writer,
+    reader,
+    appendChecksum(new Uint8Array(sectorsData))
+  );
+  if (sectorsError) {
+    return `Error setting number of sectors for write protect: ${sectorsError}`;
   }
 
   return null;
@@ -273,4 +322,86 @@ export async function writeFlash(
   }
 
   return null;
+}
+
+export async function readFlash(
+  writer: WritableStreamDefaultWriter<Uint8Array>,
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  address: number,
+  numBytes: number
+): Promise<SerialResult> {
+  if (address < 0 || !Number.isInteger(address)) {
+    return { data: null, error: `Invalid address: ${address}` };
+  }
+  if (numBytes === 0) {
+    return { data: null, error: "readFlash called with empty data" };
+  }
+  if (numBytes % 4 !== 0) {
+    return {
+      data: null,
+      error: `readFlash called with invalid data length: ${numBytes}; must be a multiple of 4`,
+    };
+  }
+  if (numBytes > 256) {
+    return {
+      data: null,
+      error: `readFlash called with invalid data length: ${numBytes}; must be <=256`,
+    };
+  }
+
+  let error = await writeAndExpectAck(writer, reader, COMMANDS.READ_MEMORY);
+  if (error) {
+    return { data: null, error: `Error while issuing read: ${error}` };
+  }
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  // Send the start address (4 bytes) and checksum
+  const startAddress = [
+    address >> 24,
+    (address >> 16) & 0xff,
+    (address >> 8) & 0xff,
+    address & 0xff,
+  ];
+  error = await writeAndExpectAck(
+    writer,
+    reader,
+    appendChecksum(new Uint8Array(startAddress))
+  );
+  if (error) {
+    return {
+      data: null,
+      error: `Error while setting read start address: ${error}`,
+    };
+  }
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  // Send the number of bytes to be read and checksum
+  const { data: data, error: readError } = await writeAndReadSerial(
+    writer,
+    reader,
+    new Uint8Array([numBytes - 1, 0xff ^ (numBytes - 1)]),
+    100,
+    true,
+    numBytes + 1
+  );
+  if (error) {
+    return {
+      data: null,
+      error: `Error while setting read size: ${error}`,
+    };
+  }
+  if (!data) {
+    return {
+      data: null,
+      error: `Error while setting read size: received no data`,
+    };
+  }
+  if (data[0] != BOOTLOADER_PROTOCOL.ACK) {
+    return {
+      data: null,
+      error: `Error while setting read size: received ${data[0]} instead of ACK (${BOOTLOADER_PROTOCOL.ACK})`,
+    };
+  }
+
+  return { data: data.subarray(1), error: readError };
 }
