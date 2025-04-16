@@ -149,7 +149,7 @@ export async function writeUnprotectAll(
   writer: WritableStreamDefaultWriter<Uint8Array>,
   reader: ReadableStreamDefaultReader<Uint8Array>
 ): Promise<string | null> {
-  const error = await writeAndExpectAck(writer, reader, COMMANDS.WRITE_PROTECT);
+  const error = await writeAndExpectAck(writer, reader, COMMANDS.WRITE_UNPROTECT);
   if (error) {
     return `Error while issuing write unprotect: ${error}`;
   }
@@ -187,36 +187,13 @@ export async function writeProtectAll(
   const error = await writeAndExpectAck(
     writer,
     reader,
-    COMMANDS.WRITE_UNPROTECT
+    COMMANDS.WRITE_PROTECT
   );
   if (error) {
     return `Error while issuing write protect: ${error}`;
   }
 
-  const { data: ackData, error: ackError } = await readSerial(
-    reader,
-    100,
-    false
-  );
-  if (ackError) {
-    return ackError;
-  }
-  if (!ackData || ackData.length === 0) {
-    return "Got no response when write protecting flash";
-  }
-  if (ackData.length !== 1) {
-    console.error(
-      `Got incorrect number of bytes for write protect. Expected 1, got ${ackData.length}: ${ackData}`
-    );
-    return "Got incorrect number of bytes for write protect ack";
-  }
-  if (ackData[0] !== BOOTLOADER_PROTOCOL.ACK) {
-    const errorMessage = "Write protect ack not ACKed";
-    console.error(errorMessage, ackData);
-    return errorMessage;
-  }
-
-  const sectorsData = [CHIP_PARAMETERS.NUM_SECTORS];
+  const sectorsData = [CHIP_PARAMETERS.NUM_SECTORS - 1];
   for (let i = 0; i < CHIP_PARAMETERS.NUM_SECTORS; i++) {
     sectorsData.push(i);
   }

@@ -8,6 +8,7 @@ import {
   getVersion,
   writeFlash,
   readFlash,
+  writeProtectAll,
 } from "../services/bootloader";
 
 interface FirmwareFlasherResult {
@@ -143,9 +144,9 @@ export function useFirmwareFlasher(
         console.log("Checking getProductId");
         console.log(await getProductId(writer, reader));
 
-
         // For debugging the verification step
-        const doWrite = true;
+        const doWrite = false;
+
         if (doWrite) {
           await new Promise((resolve) => setTimeout(resolve, 10));
           setFlashStatus("Erasing flash...");
@@ -173,10 +174,9 @@ export function useFirmwareFlasher(
               currentChunkSize
             );
 
-            const currentProgress =
-              Math.round(
-                ((bytesWritten + currentChunkSize / 2) / totalBytes) * 50
-              ); // Scale progress 0-50%
+            const currentProgress = Math.round(
+              ((bytesWritten + currentChunkSize / 2) / totalBytes) * 50
+            ); // Scale progress 0-50%
             setProgress(currentProgress);
             setFlashStatus(`Writing flash... ${currentProgress}%`);
 
@@ -200,6 +200,27 @@ export function useFirmwareFlasher(
           }
           setFlashStatus("Wrote flash. Verifying...");
         }
+
+        // Re-enable write protection
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        console.log("Re-enabling write protection");
+        const writeProtectError = await writeProtectAll(writer, reader);
+        if (writeProtectError) {
+          setFlashError(
+            `Error while enabling write protect: ${writeProtectError}`
+          );
+          return;
+        }
+        console.log("Re-init bootloader");
+
+        // Re-enter bootloader after reset
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        bootloaderInitError = await initBootloader(writer, reader);
+        if (bootloaderInitError) {
+          setFlashError(bootloaderInitError);
+          return;
+        }
+        console.log("Re-init bootloader done");
 
         const readChunkSize = 256; // Max chunk size for read command
         let bytesVerified = 0;
@@ -242,7 +263,6 @@ export function useFirmwareFlasher(
                 16
               )}: ${readError}`
             );
-            // throw new Error(`Verification read failed: ${readError}`);
             return;
           }
           if (!readData || readData.length !== currentChunkSize) {
@@ -251,7 +271,6 @@ export function useFirmwareFlasher(
                 16
               )}. Expected ${currentChunkSize}, got ${readData?.length ?? 0}.`
             );
-            // throw new Error(`Verification length mismatch`);
             return;
           }
 
@@ -279,7 +298,6 @@ export function useFirmwareFlasher(
               )}, got 0x${readData[diffIndex]?.toString(16)}.`
             );
             return;
-            // throw new Error(`Verification data mismatch`);
           }
 
           bytesVerified += currentChunkSize;
@@ -291,13 +309,13 @@ export function useFirmwareFlasher(
         setFlashStatus("Verification successful. Resetting device...");
 
         // Finally, clear Boot0 and reset to start the application
-        // await port.setSignals({ dataTerminalReady: true, requestToSend: true });
-        // await new Promise((resolve) => setTimeout(resolve, 50)); // Short delay
-        // await port.setSignals({
-        //   dataTerminalReady: true,
-        //   requestToSend: false,
-        // });
-        // setFlashStatus("Device reset. Flash complete.");
+        await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+        await new Promise((resolve) => setTimeout(resolve, 50)); // Short delay
+        await port.setSignals({
+          dataTerminalReady: true,
+          requestToSend: false,
+        });
+        setFlashStatus("Device reset. Flash complete.");
       } catch (error) {
         console.error("Firmware flashing failed:", error);
         setFlashError(
@@ -325,7 +343,7 @@ export function useFirmwareFlasher(
         // Ensure locks are always released
         if (reader) {
           try {
-            // reader.cancel(); // Optionally cancel pending reads
+            reader.cancel();
             reader.releaseLock();
           } catch (e) {
             console.error("Error releasing reader lock:", e);
@@ -333,7 +351,7 @@ export function useFirmwareFlasher(
         }
         if (writer) {
           try {
-            // await writer.close(); // Don't close, just release lock
+            await writer.close();
             writer.releaseLock();
           } catch (e) {
             console.error("Error releasing writer lock:", e);
@@ -342,7 +360,7 @@ export function useFirmwareFlasher(
         setIsFlashing(false);
       }
     },
-    [port, isFlashing, progress] // Added progress to dependencies to avoid stale closure issue in error handling
+    [port, isFlashing, progress]
   );
 
   return {
