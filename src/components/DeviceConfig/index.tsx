@@ -12,12 +12,17 @@ interface DeviceConfigProps {
   editable?: boolean;
 }
 
+// Define the possible view modes
+type ViewMode = 'simple' | 'advanced';
+
 function DeviceConfig({
   config,
   setConfig,
   editable = true,
 }: DeviceConfigProps) {
   const [localConfig, setLocalConfig] = useState<ConfigPb | null>(null);
+  // Add state for the view mode, defaulting to 'simple'
+  const [viewMode, setViewMode] = useState<ViewMode>('simple');
 
   useEffect(() => {
     // Create a deep copy to avoid modifying the original prop directly
@@ -144,6 +149,32 @@ function DeviceConfig({
   return (
     <>
       <div className={`device-config-container ${!editable ? "readonly" : ""}`}>
+        {/* Mode Selector */}
+        <div className="device-config-mode-selector">
+          <span>View Mode:</span>
+          <label>
+            <input
+              type="radio"
+              name="viewMode"
+              value="simple"
+              checked={viewMode === 'simple'}
+              onChange={() => setViewMode('simple')}
+              disabled={!editable}
+            /> Simple
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="viewMode"
+              value="advanced"
+              checked={viewMode === 'advanced'}
+              onChange={() => setViewMode('advanced')}
+              disabled={!editable}
+            /> Advanced
+          </label>
+        </div>
+
+        {/* Always Visible Options */}
         <div className="device-config-item">
           <span className="device-config-label">Motion Timeout (seconds):</span>
           <input
@@ -187,7 +218,7 @@ function DeviceConfig({
             value={displayAutoBrightnessThreshold}
             // Use the specific handler that scales the value up on change
             onChange={handleAutoBrightnessThresholdChange}
-            disabled={!editable}
+            disabled={!editable || localConfig.brightnessMode === BrightnessMode.DISABLED} // Also disable if brightness mode is off
           />
         </div>
         <div className="device-config-item">
@@ -210,7 +241,7 @@ function DeviceConfig({
             min="0"
             value={localConfig.proximityToggleTimeoutSeconds}
             onChange={handleProximityToggleTimeoutChange}
-            disabled={!editable}
+            disabled={!editable || localConfig.proximityMode !== ProximityMode.TOGGLE} // Disable if proximity mode is not Toggle
           />
         </div>
         <div className="device-config-item">
@@ -220,31 +251,39 @@ function DeviceConfig({
             min="0"
             value={localConfig.proximityThreshold}
             onChange={handleProximityThresholdChange}
-            disabled={!editable}
+            disabled={!editable || localConfig.proximityMode === ProximityMode.DISABLED} // Disable if proximity mode is off
           />
         </div>
-        <div className="device-config-item">
-          <span className="device-config-label">Low Battery Cutoff (mV):</span>
-          <input
-            type="number"
-            min="0"
-            value={localConfig.lowBatteryCutoffMillivolts}
-            onChange={handleLowBatteryCutoffChange}
-            disabled={!editable}
-          />
-        </div>
-        <div className="device-config-item">
-          <span className="device-config-label">
-            Low Battery Hysteresis (mV):
-          </span>
-          <input
-            type="number"
-            min="0"
-            value={localConfig.lowBatteryHysteresisThresholdMillivolts}
-            onChange={handleLowBatteryHysteresisChange}
-            disabled={!editable}
-          />
-        </div>
+
+        {/* Advanced Options - Conditionally Rendered */}
+        {viewMode === 'advanced' && (
+          <>
+            <div className="device-config-item">
+              <span className="device-config-label">Low Battery Cutoff (mV):</span>
+              <input
+                type="number"
+                min="0"
+                value={localConfig.lowBatteryCutoffMillivolts}
+                onChange={handleLowBatteryCutoffChange}
+                disabled={!editable}
+              />
+            </div>
+            <div className="device-config-item">
+              <span className="device-config-label">
+                Low Battery Hysteresis (mV):
+              </span>
+              <input
+                type="number"
+                min="0"
+                value={localConfig.lowBatteryHysteresisThresholdMillivolts}
+                onChange={handleLowBatteryHysteresisChange}
+                disabled={!editable}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Save Button */}
         <button
           onClick={() => localConfig && setConfig(localConfig)}
           className="device-config-save-button"

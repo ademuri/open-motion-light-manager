@@ -15,12 +15,85 @@
   color: #fff; /* White header text */
 }
 
+/* Style the mode selector */
+.device-config-mode-selector {
+  margin-bottom: 15px; /* Add space below the selector */
+  padding-bottom: 10px; /* Add space above the border line */
+  border-bottom: 1px solid #444; /* Add a subtle separator line */
+  font-size: 0.9em; /* Slightly smaller font for meta control */
+  color: #ccc; /* Slightly dimmer text */
+}
+
+/* Add some spacing within the mode selector labels */
+.device-config-mode-selector label {
+    margin-left: 10px;
+}
+.device-config-mode-selector label:first-of-type {
+    margin-left: 5px; /* Less space before the first radio */
+}
+.device-config-mode-selector input[type="radio"] {
+    margin-right: 3px; /* Space between radio and its text */
+}
+
+
 .device-config-item {
-  margin-bottom: 5px;
+  margin-bottom: 8px; /* Adjusted slightly for consistency */
 }
 
 .device-config-label {
+  display: inline-block; /* Ensure label and input align well */
+  min-width: 200px; /* Adjust as needed for alignment */
   font-weight: bold;
   margin-right: 5px;
   color: #ddd; /* Slightly darker label text */
+  vertical-align: middle; /* Align label text vertically */
+}
+
+/* Style inputs and selects for consistency */
+.device-config-container input[type="number"],
+.device-config-container select {
+  padding: 4px 6px;
+  background-color: #444;
+  color: #eee;
+  border: 1px solid #666;
+  border-radius: 3px;
+  vertical-align: middle; /* Align inputs vertically */
+}
+
+.device-config-container input[type="number"]:disabled,
+.device-config-container select:disabled,
+.device-config-container input[type="radio"]:disabled + label {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+/* Style the label next to a disabled radio */
+.device-config-mode-selector input[type="radio"]:disabled {
+    cursor: not-allowed;
+}
+
+
+.device-config-save-button {
+  margin-top: 15px; /* Add space above the save button */
+  padding: 8px 15px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.device-config-save-button:hover {
+  background-color: #0056b3;
+}
+
+.device-config-save-button:disabled {
+  background-color: #555;
+  cursor: not-allowed;
+}
+
+/* Readonly state styling */
+.device-config-container.readonly {
+  opacity: 0.7;
+  /* pointer-events: none;  You might want this, but it prevents scrolling/text selection */
 }
