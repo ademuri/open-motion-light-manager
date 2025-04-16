@@ -121,8 +121,25 @@ function DeviceConfig({
     <>
       <div className={`device-config-container ${!editable ? "readonly" : ""}`}>
         <div className="device-config-item">
-          <span className="device-config-label">Version:</span>{" "}
-          {localConfig.version}
+          <span className="device-config-label">Motion Timeout (seconds):</span>
+          <input
+            type="number"
+            min="0"
+            value={localConfig.motionTimeoutSeconds}
+            onChange={handleMotionTimeoutChange}
+            disabled={!editable}
+          />
+        </div>
+        <div className="device-config-item">
+          <span className="device-config-label">LED Duty Cycle (0-255):</span>
+          <input
+            type="number"
+            min="0"
+            max="255"
+            value={localConfig.ledDutyCycle}
+            onChange={handleLedDutyCycleChange}
+            disabled={!editable}
+          />
         </div>
         <div className="device-config-item">
           <span className="device-config-label">Brightness Mode:</span>
@@ -155,7 +172,7 @@ function DeviceConfig({
             disabled={!editable}
           >
             <option value={ProximityMode.DISABLED}>Disabled</option>
-            <option value={ProximityMode.TOGGLE}>On When Detected</option>
+            <option value={ProximityMode.TOGGLE}>Toggle</option>
           </select>
         </div>
         <div className="device-config-item">
@@ -177,27 +194,6 @@ function DeviceConfig({
             min="0"
             value={localConfig.proximityThreshold}
             onChange={handleProximityThresholdChange}
-            disabled={!editable}
-          />
-        </div>
-        <div className="device-config-item">
-          <span className="device-config-label">Motion Timeout (seconds):</span>
-          <input
-            type="number"
-            min="0"
-            value={localConfig.motionTimeoutSeconds}
-            onChange={handleMotionTimeoutChange}
-            disabled={!editable}
-          />
-        </div>
-        <div className="device-config-item">
-          <span className="device-config-label">LED Duty Cycle (0-255):</span>
-          <input
-            type="number"
-            min="0"
-            max="255"
-            value={localConfig.ledDutyCycle}
-            onChange={handleLedDutyCycleChange}
             disabled={!editable}
           />
         </div>
