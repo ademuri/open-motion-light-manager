@@ -22,12 +22,22 @@ function DeviceStatus({
       </div>
       <div className="device-status-item">
         <span className="device-status-label">Firmware Version:</span>{" "}
-        {status.firmwareVersion}
+        {status.firmwareVersion ?? "-"}
       </div>
       <div className="device-status-item">
-        <span className="device-status-label">Battery Voltage:</span>{" "}
+        <span className="device-status-label">Battery Voltage (V):</span>{" "}
         {status.batteryVoltageMillivolts
-          ? status.batteryVoltageMillivolts / 1000
+          ? (status.batteryVoltageMillivolts / 1000).toFixed(2)
+          : "-"}
+      </div>
+      <div className="device-status-item">
+        <span className="device-status-label">Proximity Value:</span>{" "}
+        {status.proximityValue ?? "-"}
+      </div>
+      <div className="device-status-item">
+        <span className="device-status-label">Ambient Light (Lux):</span>{" "}
+        {status.ambientLightValue !== undefined
+          ? (status.ambientLightValue / 4).toFixed(0)
           : "-"}
       </div>
     </div>
