@@ -13,15 +13,18 @@ interface FirmwareUpdateProps {
   onFlashComplete?: () => void;
 }
 
+// URL is relative to the `public` directory - NO leading slash
 const availableVersions: FirmwareVersion[] = [
   {
+    version: "0.1.4",
+    url: "firmware-v0.1.4.bin",
+  },
+  {
     version: "0.1.3",
-    // Relative to the `public` directory - NO leading slash
     url: "firmware-v0.1.3.bin",
   },
   {
     version: "0.1.2",
-    // Relative to the `public` directory - NO leading slash
     url: "firmware-v0.1.2.bin",
   },
 ];
