@@ -49,6 +49,8 @@ function DeviceConfig({
         ledDutyCycle: 255,
         lowBatteryCutoffMillivolts: 3000,
         lowBatteryHysteresisThresholdMillivolts: 3200,
+        rampUpTimeMs: 0, // Default for ramp_up_time_ms
+        rampDownTimeMs: 0, // Default for ramp_down_time_ms
       };
       setLocalConfig({ ...defaults, ...JSON.parse(JSON.stringify(config)) });
     } else {
@@ -149,6 +151,12 @@ function DeviceConfig({
     event: React.ChangeEvent<HTMLInputElement>
   ) =>
     handleNumberInputChange(event, "lowBatteryHysteresisThresholdMillivolts");
+  const handleRampUpTimeChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => handleNumberInputChange(event, "rampUpTimeMs");
+  const handleRampDownTimeChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => handleNumberInputChange(event, "rampDownTimeMs");
 
   const displayAutoBrightnessThreshold = Math.round(localConfig.autoBrightnessThreshold / 4);
 
@@ -267,10 +275,21 @@ function DeviceConfig({
             disabled={!editable || localConfig.proximityMode === ProximityMode.DISABLED} // Disable if proximity mode is off
           />
         </div>
+        <div className="device-config-item">
+          <span className="device-config-label">Ramp Down Time (ms):</span>
+          <input
+            type="number"
+            min="0"
+            value={localConfig.rampDownTimeMs}
+            onChange={handleRampDownTimeChange}
+            disabled={!editable}
+          />
+        </div>
 
         {/* Advanced Options - Conditionally Rendered */}
         {viewMode === 'advanced' && (
           <>
+            
             <div className="device-config-item">
               <span className="device-config-label">Low Battery Cutoff (mV):</span>
               <input
@@ -290,6 +309,16 @@ function DeviceConfig({
                 min="0"
                 value={localConfig.lowBatteryHysteresisThresholdMillivolts}
                 onChange={handleLowBatteryHysteresisChange}
+                disabled={!editable}
+              />
+            </div>
+            <div className="device-config-item">
+              <span className="device-config-label">Ramp Up Time (ms):</span>
+              <input
+                type="number"
+                min="0"
+                value={localConfig.rampUpTimeMs}
+                onChange={handleRampUpTimeChange}
                 disabled={!editable}
               />
             </div>
