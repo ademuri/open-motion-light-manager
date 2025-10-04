@@ -2,6 +2,7 @@ import {
   ConfigPb,
   BrightnessMode,
   ProximityMode,
+  MotionSensitivity,
 } from "../../../proto_out/serial";
 import "./DeviceConfig.css";
 import { useState, useEffect } from "react";
@@ -51,6 +52,7 @@ function DeviceConfig({
         lowBatteryHysteresisThresholdMillivolts: 3200,
         rampUpTimeMs: 0, // Default for ramp_up_time_ms
         rampDownTimeMs: 0, // Default for ramp_down_time_ms
+        motionSensitivity: MotionSensitivity.ONE,
       };
       setLocalConfig({ ...defaults, ...JSON.parse(JSON.stringify(config)) });
     } else {
@@ -157,6 +159,9 @@ function DeviceConfig({
   const handleRampDownTimeChange = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => handleNumberInputChange(event, "rampDownTimeMs");
+  const handleMotionSensitivityChange = (
+    event: React.ChangeEvent<HTMLSelectElement>
+  ) => handleSelectChange(event, "motionSensitivity");
 
   const displayAutoBrightnessThreshold = Math.round(localConfig.autoBrightnessThreshold / 4);
 
@@ -205,6 +210,19 @@ function DeviceConfig({
             onChange={handleMotionTimeoutChange}
             disabled={!editable}
           />
+        </div>
+        <div className="device-config-item">
+          <span className="device-config-label">Motion Sensitivity:</span>
+          <select
+            value={localConfig.motionSensitivity}
+            onChange={handleMotionSensitivityChange}
+            disabled={!editable}
+          >
+            <option value={MotionSensitivity.UNSPECIFIED} disabled></option>
+            <option value={MotionSensitivity.ONE}>High</option>
+            <option value={MotionSensitivity.TWO}>Medium</option>
+            <option value={MotionSensitivity.THREE}>Low</option>
+          </select>
         </div>
          <div className="device-config-item">
           <span className="device-config-label">LED Duty Cycle (0-255):</span>
