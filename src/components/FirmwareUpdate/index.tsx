@@ -16,6 +16,10 @@ interface FirmwareUpdateProps {
 // URL is relative to the `public` directory - NO leading slash
 const availableVersions: FirmwareVersion[] = [
   {
+    version: "0.1.6",
+    url: "firmware-v0.1.6.bin",
+  },
+  {
     version: "0.1.5",
     url: "firmware-v0.1.5.bin",
   },
