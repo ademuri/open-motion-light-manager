@@ -200,22 +200,23 @@ export function useFirmwareFlasher(
         }
 
         // Re-enable write protection
-        const writeProtectError = await writeProtectAll(writer, reader);
-        if (writeProtectError) {
-          setFlashError(
-            `Error while enabling write protect: ${writeProtectError}`
-          );
-          return;
-        }
+        // TODO: re-enable this once stm32loader supports write unprotecting.
+        // const writeProtectError = await writeProtectAll(writer, reader);
+        // if (writeProtectError) {
+        //   setFlashError(
+        //     `Error while enabling write protect: ${writeProtectError}`
+        //   );
+        //   return;
+        // }
 
-        // Re-enter bootloader after reset
-        await new Promise((resolve) => setTimeout(resolve, 10));
-        bootloaderInitError = await initBootloader(writer, reader);
-        if (bootloaderInitError) {
-          setFlashError(bootloaderInitError);
-          return;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        // // Re-enter bootloader after reset
+        // await new Promise((resolve) => setTimeout(resolve, 10));
+        // bootloaderInitError = await initBootloader(writer, reader);
+        // if (bootloaderInitError) {
+        //   setFlashError(bootloaderInitError);
+        //   return;
+        // }
+        // await new Promise((resolve) => setTimeout(resolve, 10));
 
         const readChunkSize = 256; // Max chunk size for read command
         let bytesVerified = 0;
