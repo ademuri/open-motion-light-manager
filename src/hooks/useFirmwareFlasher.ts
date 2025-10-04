@@ -8,7 +8,7 @@ import {
   getVersion,
   writeFlash,
   readFlash,
-  writeProtectAll,
+  // writeProtectAll,
 } from "../services/bootloader";
 
 interface FirmwareFlasherResult {
