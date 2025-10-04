@@ -40,6 +40,12 @@ function DeviceStatus({
           ? (status.ambientLightValue / 4).toFixed(0)
           : "-"}
       </div>
+      <div className="device-status-item">
+        <span className="device-status-label">Device temperature (°C):</span>{" "}
+        {status.temperatureCelsius !== undefined
+          ? status.temperatureCelsius
+          : "-"}
+      </div>
     </div>
   );
 }
