@@ -6,7 +6,7 @@
 [subrepo]
 	remote = git@github.com:ademuri/open-motion-light-protos.git
 	branch = main
-	commit = d62de460ec619cba59779b7285173a61fffc89ce
-	parent = 3d69f635473363784a7a4f91750a7ecf572d48c0
+	commit = 70b991f60861edffd6520bc92e9078144b4d992b
+	parent = f2d1eb0f82fbc7452e8161b4b50853f18af5ebb1
 	method = rebase
-	cmdver = 0.4.9
+	cmdver = 0.4.3
