@@ -10,16 +10,14 @@ function SerialPortSelector({
   useEffect(() => {
     const onPortChange = () => {
       navigator.serial.getPorts().then((ports) => {
-        if (selectedPort === ports[0]) {
-          return;
-        }
-        if (ports.length > 0) {
-          setSelectedPort(ports[0]);
-          setSelectedPortOnParent(ports[0]);
-        } else {
-          setSelectedPort(null);
-          setSelectedPortOnParent(null);
-        }
+        const firstPort = ports.length > 0 ? ports[0] : null;
+        setSelectedPort((current) => {
+          if (current !== firstPort) {
+            setSelectedPortOnParent(firstPort);
+            return firstPort;
+          }
+          return current;
+        });
       });
     };
 
@@ -39,7 +37,7 @@ function SerialPortSelector({
         connectionChangedHandler
       );
     };
-  }, [selectedPort, setSelectedPortOnParent]);
+  }, [setSelectedPortOnParent]);
 
   const handleChoosePort = () => {
     navigator.serial

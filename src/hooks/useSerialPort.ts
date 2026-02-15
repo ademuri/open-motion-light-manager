@@ -18,7 +18,6 @@ export function useSerialCommunication(port: SerialPort | null) {
 
       setLoading(true);
       setError("");
-      setResponse(null);
       try {
         const result = await service.sendProtobufRequest(request);
         setResponse(result);

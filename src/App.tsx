@@ -89,9 +89,15 @@ function App() {
     [sendRequest, loading]
   );
 
+  const initialRequestSentRef = useRef(false);
+
   useEffect(() => {
-    if (portConnected) {
+    if (portConnected && !initialRequestSentRef.current) {
       sendInitialRequest();
+      initialRequestSentRef.current = true;
+    }
+    if (!portConnected) {
+      initialRequestSentRef.current = false;
     }
   }, [portConnected, sendInitialRequest]);
 
@@ -120,8 +126,12 @@ function App() {
         setSelectedPortOnParent={setSelectedPort}
       ></SerialPortSelector>
       <div className="status-section">
+        {loading && <div className="loading-indicator">Refreshing...</div>}
         {error.length > 0 && selectedPort !== null ? (
           <div className="error-message">{error}</div>
+        ) : null}
+        {response === null && selectedPort !== null && portConnected ? (
+          <div className="loading-configuration">Loading configuration...</div>
         ) : null}
         {response !== null && response.config != null && (
           <DeviceConfig
@@ -134,7 +144,7 @@ function App() {
           <DeviceStatus connected={portConnected} status={status} />
         ) : null}
         {selectedPort !== null && (
-          <button onClick={sendInitialRequest}>Refresh</button>
+          <button onClick={sendInitialRequest} disabled={loading}>Refresh</button>
         )}
       </div>
       <div className="actions-column">

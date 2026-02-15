@@ -55,3 +55,15 @@
   color: #f00; /* Red error text */
   margin-bottom: 10px;
 }
+
+.loading-indicator {
+  color: #646cff;
+  font-style: italic;
+  margin-bottom: 10px;
+}
+
+.loading-configuration {
+  color: #888;
+  font-style: italic;
+  padding: 20px;
+}
