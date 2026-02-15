@@ -122,6 +122,31 @@ function DeviceConfig({
     }
   };
 
+  const handleHardwareVersionChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+    field: "major" | "minor" | "subrevision"
+  ) => {
+    const value = event.target.value;
+    const newValue = value === "" ? 0 : parseInt(value, 10);
+    if (!isNaN(newValue)) {
+      setLocalConfig((prevConfig) => {
+        if (prevConfig) {
+          const updatedConfig = {
+            ...prevConfig,
+            hardwareVersion: {
+              major: prevConfig.hardwareVersion?.major ?? 0,
+              minor: prevConfig.hardwareVersion?.minor ?? 0,
+              subrevision: prevConfig.hardwareVersion?.subrevision ?? 0,
+              [field]: newValue,
+            },
+          };
+          return updatedConfig;
+        }
+        return prevConfig;
+      });
+    }
+  };
+
   if (localConfig === null) {
     return (
       <div className="device-config-container">Loading configuration...</div>
@@ -162,6 +187,15 @@ function DeviceConfig({
   const handleMotionSensitivityChange = (
     event: React.ChangeEvent<HTMLSelectElement>
   ) => handleSelectChange(event, "motionSensitivity");
+  const handleHardwareVersionMajorChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => handleHardwareVersionChange(event, "major");
+  const handleHardwareVersionMinorChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => handleHardwareVersionChange(event, "minor");
+  const handleHardwareVersionSubrevisionChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => handleHardwareVersionChange(event, "subrevision");
 
   const displayAutoBrightnessThreshold = Math.round(localConfig.autoBrightnessThreshold / 4);
 
@@ -337,6 +371,36 @@ function DeviceConfig({
                 min="0"
                 value={localConfig.rampUpTimeMs}
                 onChange={handleRampUpTimeChange}
+                disabled={!editable}
+              />
+            </div>
+            <div className="device-config-item">
+              <span className="device-config-label">Hardware major version:</span>
+              <input
+                type="number"
+                min="0"
+                value={localConfig.hardwareVersion?.major ?? ''}
+                onChange={handleHardwareVersionMajorChange}
+                disabled={!editable}
+              />
+            </div>
+            <div className="device-config-item">
+              <span className="device-config-label">Hardware minor version:</span>
+              <input
+                type="number"
+                min="0"
+                value={localConfig.hardwareVersion?.minor ?? ''}
+                onChange={handleHardwareVersionMinorChange}
+                disabled={!editable}
+              />
+            </div>
+            <div className="device-config-item">
+              <span className="device-config-label">Hardware subrevision version:</span>
+              <input
+                type="number"
+                min="0"
+                value={localConfig.hardwareVersion?.subrevision ?? ''}
+                onChange={handleHardwareVersionSubrevisionChange}
                 disabled={!editable}
               />
             </div>
