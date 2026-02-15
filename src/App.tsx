@@ -61,7 +61,7 @@ function App() {
   const {
     response,
     error,
-    loading: _loading,
+    loading,
     sendRequest,
   } = useSerialCommunication(selectedPort);
 
@@ -72,19 +72,21 @@ function App() {
   }, []);
 
   const sendInitialRequest = useCallback(() => {
+    if (loading) return;
     const request = SerialRequest.create();
     request.requestConfig = true;
     sendRequest(request);
-  }, [sendRequest]);
+  }, [sendRequest, loading]);
 
   const sendConfig = useCallback(
     (config: ConfigPb) => {
+      if (loading) return;
       const request = SerialRequest.create();
       request.requestConfig = true;
       request.config = config;
       sendRequest(request);
     },
-    [sendRequest]
+    [sendRequest, loading]
   );
 
   useEffect(() => {
@@ -96,15 +98,15 @@ function App() {
   // Refresh status on error
   useEffect(() => {
     const intervalId = setInterval(() => {
-      if (portConnected && error.length > 0) {
+      if (portConnected && error.length > 0 && !loading) {
         sendInitialRequest();
       }
-    }, 100);
+    }, 2000);
 
     return () => {
       clearInterval(intervalId);
     };
-  }, [portConnected, error, sendInitialRequest]);
+  }, [portConnected, error, loading, sendInitialRequest]);
 
   useEffect(() => {
     if (response?.status) {

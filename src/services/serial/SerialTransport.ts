@@ -40,7 +40,7 @@ export class SerialTransport {
 
     const reader = this.port.readable.getReader();
     
-    let timeoutId: any;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const abortController = new AbortController();
 
     const cleanup = () => {

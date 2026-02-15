@@ -9,6 +9,7 @@ export class SerialService {
   private transport: SerialTransport;
   private protobuf: ProtobufProtocol;
   private bootloader: Stm32BootloaderProtocol;
+  private operationLock: Promise<void> = Promise.resolve();
 
   constructor(port: SerialPort) {
     this.connection = new SerialConnection(port);
@@ -30,23 +31,43 @@ export class SerialService {
   }
 
   /**
+   * Executes a serial operation with a lock to prevent concurrent access.
+   */
+  private async runOperation<T>(operation: () => Promise<T>): Promise<T> {
+    const currentLock = this.operationLock;
+    let releaseLock: () => void;
+    this.operationLock = new Promise((resolve) => {
+      releaseLock = resolve;
+    });
+
+    try {
+      await currentLock;
+      return await operation();
+    } finally {
+      releaseLock!();
+    }
+  }
+
+  /**
    * Sends a Protobuf request and returns the response.
    * Note: This assumes the port is already open and in the correct mode.
    */
   async sendProtobufRequest(request: SerialRequest, signal?: AbortSignal): Promise<SerialResponse> {
-    // We need to ensure locks are managed. 
-    // ProtobufProtocol.sendRequest currently uses transport.write and transport.readExact, 
-    // which both acquire/release locks internally in the current SerialTransport implementation.
-    // However, for atomic operations, we might want to hold the lock.
-    // But since SerialTransport.readChunk/readExact currently create new readers each time,
-    // it's "safe" but inefficient.
-    return this.protobuf.sendRequest(request, signal);
+    return this.runOperation(() => this.protobuf.sendRequest(request, signal));
+  }
+
+  /**
+   * Runs an operation using the STM32 Bootloader protocol.
+   * The callback receives the bootloader protocol instance.
+   */
+  async runBootloaderOperation<T>(operation: (bootloader: Stm32BootloaderProtocol) => Promise<T>): Promise<T> {
+    return this.runOperation(() => operation(this.bootloader));
   }
 
   /**
    * Returns the STM32 Bootloader protocol handler.
-   * Switching to bootloader mode usually requires changing baud rate or other settings,
-   * so the caller should handle closing/re-opening the port if necessary.
+   * Note: Using this directly is not thread-safe. Use runBootloaderOperation instead
+   * if concurrent access is possible.
    */
   get stm32(): Stm32BootloaderProtocol {
     return this.bootloader;

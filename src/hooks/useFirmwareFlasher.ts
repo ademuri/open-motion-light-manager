@@ -51,7 +51,6 @@ export function useFirmwareFlasher(
 
       try {
         const totalBytes = firmwareData.byteLength;
-        const stm32 = service.stm32;
 
         // Boot0 and Reset toggling
         setFlashStatus("Entering bootloader mode...");
@@ -62,69 +61,71 @@ export function useFirmwareFlasher(
         await port.setSignals({ dataTerminalReady: false, requestToSend: false });
         await new Promise((resolve) => setTimeout(resolve, 10));
 
-        await stm32.init();
-        setFlashStatus("Bootloader acknowledged.");
+        await service.runBootloaderOperation(async (stm32) => {
+          await stm32.init();
+          setFlashStatus("Bootloader acknowledged.");
 
-        const productId = await stm32.getProductId();
-        if (productId !== CHIP_PARAMETERS.PRODUCT_ID) {
-          throw new Error(`Incorrect product ID: 0x${productId.toString(16)} (expected 0x${CHIP_PARAMETERS.PRODUCT_ID.toString(16)})`);
-        }
-        setFlashStatus("Confirmed chip product ID");
+          const productId = await stm32.getProductId();
+          if (productId !== CHIP_PARAMETERS.PRODUCT_ID) {
+            throw new Error(`Incorrect product ID: 0x${productId.toString(16)} (expected 0x${CHIP_PARAMETERS.PRODUCT_ID.toString(16)})`);
+          }
+          setFlashStatus("Confirmed chip product ID");
 
-        const version = await stm32.getVersion();
-        console.log(`Bootloader version: ${version}`);
+          const version = await stm32.getVersion();
+          console.log(`Bootloader version: ${version}`);
 
-        setFlashStatus("Write unprotecting...");
-        await stm32.writeUnprotect();
-        
-        // After unprotect, device might reset or need re-init
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        await stm32.init();
-
-        setFlashStatus("Erasing flash...");
-        await stm32.eraseAll();
-        setFlashStatus("Erased flash");
-
-        setFlashStatus("Writing firmware...");
-        const writeChunkSize = 256;
-        let bytesWritten = 0;
-        let currentAddress = CHIP_PARAMETERS.PROGRAM_FLASH_START_ADDRESS;
-
-        while (bytesWritten < totalBytes) {
-          const chunk = new Uint8Array(firmwareData, bytesWritten, Math.min(writeChunkSize, totalBytes - bytesWritten));
+          setFlashStatus("Write unprotecting...");
+          await stm32.writeUnprotect();
           
-          const currentProgress = Math.round((bytesWritten / totalBytes) * 50);
-          setProgress(currentProgress);
-          setFlashStatus(`Writing flash... ${currentProgress}%`);
+          // After unprotect, device might reset or need re-init
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          await stm32.init();
 
-          await stm32.writeMemory(currentAddress, chunk);
+          setFlashStatus("Erasing flash...");
+          await stm32.eraseAll();
+          setFlashStatus("Erased flash");
 
-          bytesWritten += chunk.length;
-          currentAddress += chunk.length;
-        }
+          setFlashStatus("Writing firmware...");
+          const writeChunkSize = 256;
+          let bytesWritten = 0;
+          let currentAddress = CHIP_PARAMETERS.PROGRAM_FLASH_START_ADDRESS;
 
-        setFlashStatus("Verifying flash...");
-        const readChunkSize = 256;
-        let bytesVerified = 0;
-        let currentReadAddress = CHIP_PARAMETERS.PROGRAM_FLASH_START_ADDRESS;
+          while (bytesWritten < totalBytes) {
+            const chunk = new Uint8Array(firmwareData, bytesWritten, Math.min(writeChunkSize, totalBytes - bytesWritten));
+            
+            const currentProgress = Math.round((bytesWritten / totalBytes) * 50);
+            setProgress(currentProgress);
+            setFlashStatus(`Writing flash... ${currentProgress}%`);
 
-        while (bytesVerified < totalBytes) {
-          const length = Math.min(readChunkSize, totalBytes - bytesVerified);
-          
-          const currentProgress = 50 + Math.round((bytesVerified / totalBytes) * 50);
-          setProgress(currentProgress);
-          setFlashStatus(`Verifying flash... ${currentProgress}%`);
+            await stm32.writeMemory(currentAddress, chunk);
 
-          const readData = await stm32.readMemory(currentReadAddress, length);
-          const originalChunk = new Uint8Array(firmwareData, bytesVerified, length);
-
-          if (!compareUint8Arrays(readData, originalChunk)) {
-              throw new Error(`Verification failed at address 0x${currentReadAddress.toString(16)}`);
+            bytesWritten += chunk.length;
+            currentAddress += chunk.length;
           }
 
-          bytesVerified += length;
-          currentReadAddress += length;
-        }
+          setFlashStatus("Verifying flash...");
+          const readChunkSize = 256;
+          let bytesVerified = 0;
+          let currentReadAddress = CHIP_PARAMETERS.PROGRAM_FLASH_START_ADDRESS;
+
+          while (bytesVerified < totalBytes) {
+            const length = Math.min(readChunkSize, totalBytes - bytesVerified);
+            
+            const currentProgress = 50 + Math.round((bytesVerified / totalBytes) * 50);
+            setProgress(currentProgress);
+            setFlashStatus(`Verifying flash... ${currentProgress}%`);
+
+            const readData = await stm32.readMemory(currentReadAddress, length);
+            const originalChunk = new Uint8Array(firmwareData, bytesVerified, length);
+
+            if (!compareUint8Arrays(readData, originalChunk)) {
+                throw new Error(`Verification failed at address 0x${currentReadAddress.toString(16)}`);
+            }
+
+            bytesVerified += length;
+            currentReadAddress += length;
+          }
+        });
 
         setProgress(100);
         setFlashStatus("Verification successful. Resetting device...");
@@ -143,7 +144,7 @@ export function useFirmwareFlasher(
           await port.setSignals({ dataTerminalReady: true, requestToSend: true });
           await new Promise((resolve) => setTimeout(resolve, 50));
           await port.setSignals({ dataTerminalReady: true, requestToSend: false });
-        } catch (e) { /* ignore reset error */ }
+        } catch (_e) { /* ignore reset error */ }
       } finally {
         setIsFlashing(false);
       }
