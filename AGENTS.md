@@ -14,20 +14,21 @@ The application communicates with the hardware via the **Web Serial API**, using
 
 ## Architecture
 - **`src/App.tsx`**: The main entry point that manages the serial port lifecycle and high-level application state.
-- **`src/hooks/useSerialPort.ts`**: Provides a hook for sending and receiving Protobuf-encoded messages over the serial port. It implements a simple length-prefixed framing protocol.
-- **`src/hooks/useFirmwareFlasher.ts`**: Handles the firmware update process, including putting the STM32 into bootloader mode by toggling RTS and DTR signals.
-- **`src/services/bootloader/`**: Implements the low-level STM32 bootloader commands (init, get ID, erase, write, read/verify).
+- **`src/hooks/useSerialPort.ts`**: Provides hooks (`useSerialService`, `useSerialCommunication`) for interacting with the serial port using the unified `SerialService`.
+- **`src/hooks/useFirmwareFlasher.ts`**: Handles the firmware update process using `Stm32BootloaderProtocol` via the `SerialService`.
+- **`src/services/serial/`**: Contains the unified serial service and protocol implementations (Protobuf, STM32 Bootloader).
+- **`src/services/bootloader/`**: Contains constants and configuration for the STM32 bootloader.
 - **`proto/serial.proto`**: Defines the `SerialRequest` and `SerialResponse` messages used for device configuration and status.
 - **`public/firmware-vX.X.X.bin`**: Contains the firmware binary files available for flashing.
 
 ## Building and Running
-> **Note:** To minimize token usage and avoid noisy output, always run `npm` commands with the `--no-update-notifier` flag.
+> **Note:** To minimize token usage and avoid noisy output, `update-notifier=false` has been configured in `.npmrc`.
 
-- **Install Dependencies:** `npm install --no-update-notifier`
-- **Development Server:** `npm run dev -- --no-update-notifier` (Starts a Vite server with HTTPS enabled, which is often required for Web Serial).
-- **Production Build:** `npm run build -- --no-update-notifier`
-- **Protobuf Compilation:** `npm run compile-proto -- --no-update-notifier` (Automatically runs during `dev` and `build` via a custom Vite plugin).
-- **Linting:** `npm run lint -- --no-update-notifier`
+- **Install Dependencies:** `npm install`
+- **Development Server:** `npm run dev` (Starts a Vite server with HTTPS enabled, which is often required for Web Serial).
+- **Production Build:** `npm run build`
+- **Protobuf Compilation:** `npm run compile-proto` (Automatically runs during `dev` and `build` via a custom Vite plugin).
+- **Linting:** `npm run lint`
 
 ## Development Conventions
 - **Protobuf Integration:** Proto files are located in `proto/`. Changes to these files will automatically trigger a re-compilation of the TypeScript definitions in `proto_out/` during development.
