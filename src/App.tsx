@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import "./App.css";
 import SerialPortSelector from "./components/SerialPortSelector";
-import { useSerialCommunication } from "./hooks/useSerialPort";
+import { useSerialCommunication, useSerialService } from "./hooks/useSerialPort";
 import { ConfigPb, SerialRequest, StatusPb } from "../proto_out/serial";
 import DeviceStatus from "./components/DeviceStatus";
 import DeviceConfig from "./components/DeviceConfig";
@@ -9,20 +9,21 @@ import FirmwareUpdate from "./components/FirmwareUpdate";
 
 function App() {
   const [selectedPort, setSelectedPort] = useState<SerialPort | null>(null);
+  const service = useSerialService(selectedPort);
   const [portConnected, setPortConnected] = useState(false);
   const portOpeningRef = useRef(false);
   const [status, setStatus] = useState<StatusPb | null>(null);
 
   const openPort = useCallback(async () => {
-    if (selectedPort === null) {
+    if (selectedPort === null || !service) {
       setPortConnected(false);
     }
 
-    if (selectedPort === null || portOpeningRef.current) {
+    if (selectedPort === null || !service || portOpeningRef.current) {
       return;
     }
 
-    if (selectedPort.readable) {
+    if (service.isOpened) {
       console.log("Port already open");
       setPortConnected(true);
       return;
@@ -32,7 +33,7 @@ function App() {
 
     console.log("Opening port...");
     try {
-      await selectedPort.open({ baudRate: 115200, bufferSize: 1000 });
+      await service.open({ baudRate: 115200, bufferSize: 1000 });
       console.log("Connected!");
       setPortConnected(true);
     } catch (error) {
@@ -40,7 +41,7 @@ function App() {
     } finally {
       portOpeningRef.current = false;
     }
-  }, [selectedPort]);
+  }, [selectedPort, service]);
 
   useEffect(() => {
     openPort();
