@@ -13,7 +13,7 @@ export class SerialService {
 
   constructor(port: SerialPort) {
     this.connection = new SerialConnection(port);
-    this.transport = new SerialTransport(port);
+    this.transport = new SerialTransport(this.connection);
     this.protobuf = new ProtobufProtocol(this.transport);
     this.bootloader = new Stm32BootloaderProtocol(this.transport);
   }
@@ -42,8 +42,10 @@ export class SerialService {
 
     try {
       await currentLock;
-      return await operation();
+      const result = await operation();
+      return result;
     } finally {
+      this.connection.releaseLocks();
       releaseLock!();
     }
   }

@@ -1,3 +1,4 @@
+import { SerialConnection } from "./SerialConnection";
 import { ConnectionError, TimeoutError } from "./errors";
 
 export interface ReadOptions {
@@ -8,17 +9,14 @@ export interface ReadOptions {
 export class SerialTransport {
   private leftover: Uint8Array | null = null;
 
-  constructor(private port: SerialPort) {}
+  constructor(private connection: SerialConnection) {}
 
   async write(data: Uint8Array): Promise<void> {
-    if (!this.port.writable) {
-      throw new ConnectionError("Port is not writable");
-    }
-    const writer = this.port.writable.getWriter();
+    const writer = this.connection.getWriter();
     try {
       await writer.write(data);
     } finally {
-      writer.releaseLock();
+      this.connection.releaseLocks();
     }
   }
 
@@ -34,11 +32,7 @@ export class SerialTransport {
       return chunk;
     }
 
-    if (!this.port.readable) {
-      throw new ConnectionError("Port is not readable");
-    }
-
-    const reader = this.port.readable.getReader();
+    const reader = this.connection.getReader();
     
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const abortController = new AbortController();
@@ -46,19 +40,20 @@ export class SerialTransport {
     const cleanup = () => {
       if (timeoutId) clearTimeout(timeoutId);
       signal?.removeEventListener("abort", onAbort);
-      if (!reader.closed) {
-          reader.releaseLock();
-      }
+      // We don't release lock here anymore, because we want to keep the reader
+      // active for the duration of the higher-level operation (like readExact).
+      // The lock is managed by SerialConnection and released by the caller or at end of session.
     };
 
     const onAbort = () => {
         abortController.abort();
         reader.cancel("Aborted").catch(() => {});
+        this.connection.releaseLocks();
     };
 
     if (signal) {
         if (signal.aborted) {
-            reader.releaseLock();
+            this.connection.releaseLocks();
             throw new DOMException("Aborted", "AbortError");
         }
         signal.addEventListener("abort", onAbort);
@@ -68,6 +63,7 @@ export class SerialTransport {
         timeoutId = setTimeout(() => {
             abortController.abort();
             reader.cancel("Timeout").catch(() => {});
+            this.connection.releaseLocks();
         }, timeout);
     }
 

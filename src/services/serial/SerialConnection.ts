@@ -7,6 +7,10 @@ export class SerialConnection {
   constructor(private port: SerialPort) {}
 
   get opened() {
+    // A port is "open" if its readable/writable streams exist.
+    // However, if we've already acquired a reader/writer, they might still be open
+    // even if we haven't checked port.readable lately.
+    // For Web Serial, port.readable/writable are non-null when the port is open.
     return !!(this.port.readable && this.port.writable);
   }
 

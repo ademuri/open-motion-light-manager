@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { SerialTransport } from "./SerialTransport";
-import { ConnectionError } from "./errors";
+import { SerialConnection } from "./SerialConnection";
 
 describe("SerialTransport", () => {
   it("should read exactly the requested number of bytes", async () => {
@@ -27,12 +27,8 @@ describe("SerialTransport", () => {
       writable: {},
     } as any as SerialPort;
 
-    const transport = new SerialTransport(mockPort);
-    
-    // We want to read 2 bytes. 
-    // The first readChunk will return [1, 2, 3, 4, 5].
-    // readExact should take [1, 2] and somehow not lose [3, 4, 5]? 
-    // Actually, currently it WILL lose them.
+    const connection = new SerialConnection(mockPort);
+    const transport = new SerialTransport(connection);
     
     const result = await transport.readExact(2);
     expect(result).toEqual(new Uint8Array([1, 2]));
@@ -62,7 +58,8 @@ describe("SerialTransport", () => {
       writable: {},
     } as any as SerialPort;
 
-    const transport = new SerialTransport(mockPort);
+    const connection = new SerialConnection(mockPort);
+    const transport = new SerialTransport(connection);
     
     // First read 1 byte (the length byte in protobuf protocol)
     const lengthResult = await transport.readExact(1);
@@ -100,9 +97,11 @@ describe("SerialTransport", () => {
         writable: {},
       } as any as SerialPort;
 
-      const transport = new SerialTransport(mockPort);
+      const connection = new SerialConnection(mockPort);
+      const transport = new SerialTransport(connection);
       const result = await transport.readExact(5);
       expect(result).toEqual(new Uint8Array([1, 2, 3, 4, 5]));
-      expect(mockReadable.getReader).toHaveBeenCalledTimes(3);
+      // SerialConnection.getReader will return the same reader if it's already there
+      expect(mockReadable.getReader).toHaveBeenCalledTimes(1);
   });
 });
