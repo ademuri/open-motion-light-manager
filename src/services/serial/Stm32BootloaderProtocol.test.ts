@@ -1,0 +1,122 @@
+import { describe, it, expect, vi } from "vitest";
+import { Stm32BootloaderProtocol } from "./Stm32BootloaderProtocol";
+import { BOOTLOADER_PROTOCOL } from "../bootloader/constants";
+
+describe("Stm32BootloaderProtocol", () => {
+  it("should calculate checksum correctly (XOR)", () => {
+    const protocol = new Stm32BootloaderProtocol({} as any);
+    const data = new Uint8Array([0x01, 0x02, 0x03]);
+    // 0x01 ^ 0x02 ^ 0x03 = 0x00
+    // @ts-ignore - accessing private method for test
+    expect(protocol.calculateChecksum(data)).toBe(0x00);
+
+    const data2 = new Uint8Array([0x11, 0x22]);
+    // 0x11 ^ 0x22 = 0x33
+    // @ts-ignore
+    expect(protocol.calculateChecksum(data2)).toBe(0x33);
+  });
+
+  it("should append checksum correctly", () => {
+    const protocol = new Stm32BootloaderProtocol({} as any);
+    const data = new Uint8Array([0x11, 0x22]);
+    // @ts-ignore
+    const result = protocol.appendChecksum(data);
+    expect(result).toEqual(new Uint8Array([0x11, 0x22, 0x33]));
+  });
+
+  it("should succeed on ACK", async () => {
+    const mockTransport = {
+      readExact: vi.fn().mockResolvedValue(new Uint8Array([BOOTLOADER_PROTOCOL.ACK])),
+    } as any;
+
+    const protocol = new Stm32BootloaderProtocol(mockTransport);
+    await expect(protocol.expectAck()).resolves.toBeUndefined();
+    expect(mockTransport.readExact).toHaveBeenCalledWith(1, expect.any(Object));
+  });
+
+  it("should throw on NACK", async () => {
+    const mockTransport = {
+      readExact: vi.fn().mockResolvedValue(new Uint8Array([BOOTLOADER_PROTOCOL.NACK])),
+    } as any;
+
+    const protocol = new Stm32BootloaderProtocol(mockTransport);
+    await expect(protocol.expectAck()).rejects.toThrow("Received NACK");
+  });
+
+  it("should get product ID correctly", async () => {
+      const mockTransport = {
+          write: vi.fn().mockResolvedValue(undefined),
+          readExact: vi.fn()
+              .mockResolvedValueOnce(new Uint8Array([BOOTLOADER_PROTOCOL.ACK])) // for command ACK
+              .mockResolvedValueOnce(new Uint8Array([1])) // size-1 = 1 (2 bytes)
+              .mockResolvedValueOnce(new Uint8Array([0x04, 0x13])) // ID
+              .mockResolvedValueOnce(new Uint8Array([BOOTLOADER_PROTOCOL.ACK])) // final ACK
+      } as any;
+
+      const protocol = new Stm32BootloaderProtocol(mockTransport);
+      const id = await protocol.getProductId();
+      expect(id).toBe(0x0413);
+  });
+
+  it("should get version correctly", async () => {
+      const mockTransport = {
+          write: vi.fn().mockResolvedValue(undefined),
+          readExact: vi.fn()
+              .mockResolvedValueOnce(new Uint8Array([BOOTLOADER_PROTOCOL.ACK]))
+              .mockResolvedValueOnce(new Uint8Array([0x22, 0x01, 0x02])) // version 0x22, options
+              .mockResolvedValueOnce(new Uint8Array([BOOTLOADER_PROTOCOL.ACK]))
+      } as any;
+
+      const protocol = new Stm32BootloaderProtocol(mockTransport);
+      const version = await protocol.getVersion();
+      expect(version).toBe(0x22);
+  });
+
+  it("should erase all correctly", async () => {
+      const mockTransport = {
+          write: vi.fn().mockResolvedValue(undefined),
+          readExact: vi.fn().mockResolvedValue(new Uint8Array([BOOTLOADER_PROTOCOL.ACK])),
+      } as any;
+
+      const protocol = new Stm32BootloaderProtocol(mockTransport);
+      await protocol.eraseAll();
+      
+      expect(mockTransport.write).toHaveBeenCalledTimes(2);
+      expect(mockTransport.write).toHaveBeenNthCalledWith(2, new Uint8Array([0xFF, 0xFF, 0x00])); // Special 0xFFFF + checksum 0x00
+  });
+
+  it("should write memory correctly", async () => {
+      const mockTransport = {
+          write: vi.fn().mockResolvedValue(undefined),
+          readExact: vi.fn().mockResolvedValue(new Uint8Array([BOOTLOADER_PROTOCOL.ACK])),
+      } as any;
+
+      const protocol = new Stm32BootloaderProtocol(mockTransport);
+      const data = new Uint8Array([0xAA, 0xBB, 0xCC, 0xDD]);
+      await protocol.writeMemory(0x08000000, data);
+      
+      expect(mockTransport.write).toHaveBeenCalledTimes(3);
+      // Check address write: 0x08, 0x00, 0x00, 0x00 + checksum (0x08)
+      expect(mockTransport.write).toHaveBeenNthCalledWith(2, new Uint8Array([0x08, 0x00, 0x00, 0x00, 0x08]));
+      // Check payload write: length-1 (3), data, checksum (3^0xAA^0xBB^0xCC^0xDD)
+      // 3 ^ 0xAA ^ 0xBB ^ 0xCC ^ 0xDD = 3 ^ 170 ^ 187 ^ 204 ^ 221 = 0x3 ^ 0xAA ^ 0xBB ^ 0xCC ^ 0xDD
+      // let's just check it was called.
+  });
+
+  it("should read memory correctly", async () => {
+      const mockTransport = {
+          write: vi.fn().mockResolvedValue(undefined),
+          readExact: vi.fn()
+              .mockResolvedValueOnce(new Uint8Array([BOOTLOADER_PROTOCOL.ACK])) // cmd ack
+              .mockResolvedValueOnce(new Uint8Array([BOOTLOADER_PROTOCOL.ACK])) // addr ack
+              .mockResolvedValueOnce(new Uint8Array([BOOTLOADER_PROTOCOL.ACK])) // len ack
+              .mockResolvedValueOnce(new Uint8Array([0x11, 0x22, 0x33, 0x44])) // data
+      } as any;
+
+      const protocol = new Stm32BootloaderProtocol(mockTransport);
+      const data = await protocol.readMemory(0x08000000, 4);
+      
+      expect(data).toEqual(new Uint8Array([0x11, 0x22, 0x33, 0x44]));
+      expect(mockTransport.write).toHaveBeenCalledTimes(3);
+  });
+});
