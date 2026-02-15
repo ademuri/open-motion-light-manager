@@ -6,6 +6,8 @@ export interface ReadOptions {
 }
 
 export class SerialTransport {
+  private leftover: Uint8Array | null = null;
+
   constructor(private port: SerialPort) {}
 
   async write(data: Uint8Array): Promise<void> {
@@ -26,6 +28,12 @@ export class SerialTransport {
    * more specific read logic (e.g., read N bytes, read until delimiter).
    */
   async readChunk({ timeout, signal }: ReadOptions = {}): Promise<Uint8Array | null> {
+    if (this.leftover && this.leftover.length > 0) {
+      const chunk = this.leftover;
+      this.leftover = null;
+      return chunk;
+    }
+
     if (!this.port.readable) {
       throw new ConnectionError("Port is not readable");
     }
@@ -99,13 +107,15 @@ export class SerialTransport {
               throw new ConnectionError("Stream closed before receiving expected length");
           }
 
-          const toCopy = Math.min(chunk.length, length - offset);
+          const needed = length - offset;
+          const toCopy = Math.min(chunk.length, needed);
           buffer.set(chunk.subarray(0, toCopy), offset);
-          offset += toCopy;
           
-          // Note: if chunk.length > remaining needed, the rest is currently lost 
-          // because we get a new reader each time in readChunk.
-          // This confirms we need a more persistent reader if we want to be efficient.
+          if (chunk.length > needed) {
+              this.leftover = chunk.subarray(needed);
+          }
+
+          offset += toCopy;
       }
       return buffer;
   }
