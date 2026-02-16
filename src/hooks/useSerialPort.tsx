@@ -36,9 +36,11 @@ export function useSerialCommunication() {
       try {
         const result = await service.sendProtobufRequest(request);
         setResponse(result);
+        return result;
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
         console.error("Error in sendRequest:", err);
+        throw err;
       } finally {
         setLoading(false);
       }
@@ -46,5 +48,15 @@ export function useSerialCommunication() {
     [service]
   );
 
-  return { response, error, loading, sendRequest };
+  const resetMcu = useCallback(async () => {
+    if (!service) return;
+    try {
+      await service.resetMcu();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      console.error("Error resetting MCU:", err);
+    }
+  }, [service]);
+
+  return { response, error, loading, sendRequest, resetMcu };
 }

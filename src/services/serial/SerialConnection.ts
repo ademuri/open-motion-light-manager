@@ -60,7 +60,7 @@ export class SerialConnection {
     if (this.reader) {
       try {
         this.reader.releaseLock();
-      } catch (e) {
+      } catch {
         // Ignore errors if already released
       }
       this.reader = null;
@@ -71,7 +71,7 @@ export class SerialConnection {
     if (this.writer) {
       try {
         this.writer.releaseLock();
-      } catch (e) {
+      } catch {
         // Ignore errors if already released
       }
       this.writer = null;
@@ -81,5 +81,9 @@ export class SerialConnection {
   releaseLocks() {
     this.releaseReader();
     this.releaseWriter();
+  }
+
+  async setSignals(signals: SerialOutputSignals) {
+    await this.port.setSignals(signals);
   }
 }
