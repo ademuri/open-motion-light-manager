@@ -168,8 +168,12 @@ export function useFirmwareFlasher(): FirmwareFlasherResult {
         setFlashStatus("Device reset. Flash complete.");
 
       } catch (error) {
-        console.error("Firmware flashing failed:", error);
-        setFlashError(error instanceof Error ? error.message : String(error));
+        if (error instanceof DOMException && error.name === "AbortError") {
+          console.log("Firmware flashing cancelled by user.");
+        } else {
+          console.error("Firmware flashing failed:", error);
+          setFlashError(error instanceof Error ? error.message : String(error));
+        }
         // Attempt reset on error
         try {
           await port.setSignals({ dataTerminalReady: true, requestToSend: true });

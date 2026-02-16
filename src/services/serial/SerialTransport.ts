@@ -104,6 +104,9 @@ export class SerialTransport {
 
           const chunk = await this.readChunk({ ...options, timeout: remainingTimeout });
           if (!chunk) {
+              if (options.signal?.aborted) {
+                  throw new DOMException("Aborted", "AbortError");
+              }
               throw new ConnectionError("Stream closed before receiving expected length");
           }
 
