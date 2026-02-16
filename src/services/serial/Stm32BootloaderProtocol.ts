@@ -1,5 +1,5 @@
 import { SerialTransport } from "./SerialTransport";
-import { BOOTLOADER_PROTOCOL, COMMANDS } from "../bootloader/constants";
+import { BOOTLOADER_PROTOCOL, COMMANDS, CHIP_PARAMETERS } from "../bootloader/constants";
 import { ProtocolError } from "./errors";
 
 export class Stm32BootloaderProtocol {
@@ -20,8 +20,8 @@ export class Stm32BootloaderProtocol {
     return result;
   }
 
-  async expectAck(signal?: AbortSignal): Promise<void> {
-    const response = await this.transport.readExact(1, { timeout: 100, signal });
+  async expectAck(signal?: AbortSignal, timeout: number = 1000): Promise<void> {
+    const response = await this.transport.readExact(1, { timeout, signal });
     if (response[0] === BOOTLOADER_PROTOCOL.NACK) {
       throw new ProtocolError("Received NACK from bootloader");
     }
@@ -39,22 +39,9 @@ export class Stm32BootloaderProtocol {
     await this.transport.write(COMMANDS.GET_ID);
     await this.expectAck(signal);
     
-    // Response format: ACK, length (N), ID bytes (N+1), ACK
-    // Based on bootloaderCommands.ts, it expects 5 bytes total: 
-    // [ACK, size-1, byte1, byte2, ACK]
-    // Wait, bootloaderCommands.ts read the whole thing at once.
-    // Let's re-examine bootloaderCommands.ts logic.
-    /*
-      const { data, error } = await writeAndReadSerial(writer, reader, COMMANDS.GET_ID);
-      // data.length !== 5
-      // data[4] !== ACK
-      // id = (data[2] << 8) | data[3];
-    */
-    // My transport readExact doesn't automatically read until ACK unless I tell it.
-    
-    const sizeByte = await this.transport.readExact(1, { timeout: 100, signal });
+    const sizeByte = await this.transport.readExact(1, { timeout: 1000, signal });
     const size = sizeByte[0] + 1;
-    const idBytes = await this.transport.readExact(size, { timeout: 100, signal });
+    const idBytes = await this.transport.readExact(size, { timeout: 1000, signal });
     await this.expectAck(signal);
 
     let id = 0;
@@ -69,7 +56,7 @@ export class Stm32BootloaderProtocol {
     await this.expectAck(signal);
     
     // Response: ACK, version, option1, option2, ACK
-    const data = await this.transport.readExact(3, { timeout: 100, signal });
+    const data = await this.transport.readExact(3, { timeout: 1000, signal });
     await this.expectAck(signal);
     
     return data[0];
@@ -78,19 +65,28 @@ export class Stm32BootloaderProtocol {
   async writeUnprotect(signal?: AbortSignal): Promise<void> {
       await this.transport.write(COMMANDS.WRITE_UNPROTECT);
       await this.expectAck(signal);
-      await this.expectAck(signal); // Second ACK after completion
+      await this.expectAck(signal, 10000); // Wait for mass erase completion
   }
 
   async eraseAll(signal?: AbortSignal): Promise<void> {
       await this.transport.write(COMMANDS.ERASE_EXTENDED);
       await this.expectAck(signal);
       
-      // Special case: 0xFFFF 0x00 for all sectors
-      const eraseCmd = new Uint8Array([0xFF, 0xFF]);
-      await this.transport.write(this.appendChecksum(eraseCmd));
+      const numPages = Math.ceil(CHIP_PARAMETERS.PROGRAM_FLASH_SIZE / CHIP_PARAMETERS.FLASH_PAGE_SIZE) - 1;
+      const pageData = new Uint8Array(2 + (numPages + 1) * 2);
       
-      // Erase can take a long time
-      await this.expectAck(signal);
+      // Number of pages (2 bytes, N-1)
+      pageData[0] = numPages >> 8;
+      pageData[1] = numPages & 0xFF;
+      
+      // Page indices (2 bytes each)
+      for (let n = 0; n <= numPages; n++) {
+          pageData[2 + n * 2] = n >> 8;
+          pageData[2 + n * 2 + 1] = n & 0xFF;
+      }
+
+      await this.transport.write(this.appendChecksum(pageData));
+      await this.expectAck(signal, 10000);
   }
 
   async writeMemory(address: number, data: Uint8Array, signal?: AbortSignal): Promise<void> {

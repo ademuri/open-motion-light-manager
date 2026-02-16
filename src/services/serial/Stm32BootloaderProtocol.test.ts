@@ -31,7 +31,7 @@ describe("Stm32BootloaderProtocol", () => {
 
     const protocol = new Stm32BootloaderProtocol(mockTransport);
     await expect(protocol.expectAck()).resolves.toBeUndefined();
-    expect(mockTransport.readExact).toHaveBeenCalledWith(1, expect.any(Object));
+    expect(mockTransport.readExact).toHaveBeenCalledWith(1, { timeout: 1000, signal: undefined });
   });
 
   it("should throw on NACK", async () => {
@@ -72,7 +72,7 @@ describe("Stm32BootloaderProtocol", () => {
       expect(version).toBe(0x22);
   });
 
-  it("should erase all correctly", async () => {
+  it("should erase all correctly (page-by-page)", async () => {
       const mockTransport = {
           write: vi.fn().mockResolvedValue(undefined),
           readExact: vi.fn().mockResolvedValue(new Uint8Array([BOOTLOADER_PROTOCOL.ACK])),
@@ -82,7 +82,15 @@ describe("Stm32BootloaderProtocol", () => {
       await protocol.eraseAll();
       
       expect(mockTransport.write).toHaveBeenCalledTimes(2);
-      expect(mockTransport.write).toHaveBeenNthCalledWith(2, new Uint8Array([0xFF, 0xFF, 0x00])); // Special 0xFFFF + checksum 0x00
+      // Number of pages for 64KB with 128B pages is 511 (0x01FF)
+      // Check the second write call (page data)
+      const sentPageData = mockTransport.write.mock.calls[1][0];
+      expect(sentPageData[0]).toBe(0x01); // High byte of 511
+      expect(sentPageData[1]).toBe(0xFF); // Low byte of 511
+      expect(sentPageData[2]).toBe(0x00); // High byte of page 0
+      expect(sentPageData[3]).toBe(0x00); // Low byte of page 0
+      
+      expect(mockTransport.readExact).toHaveBeenLastCalledWith(1, { timeout: 10000, signal: undefined });
   });
 
   it("should write memory correctly", async () => {
