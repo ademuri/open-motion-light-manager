@@ -67,6 +67,13 @@
   background-color: #218838;
 }
 
+.firmware-update-button.cancel {
+   background-color: #dc3545; /* Red for cancel */
+}
+.firmware-update-button.cancel:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
 
 .firmware-update-button:disabled {
   background-color: #555; /* Darker gray for disabled state */

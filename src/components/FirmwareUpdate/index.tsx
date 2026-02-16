@@ -47,6 +47,7 @@ function FirmwareUpdate({
   const [firmwareData, setFirmwareData] = useState<ArrayBuffer | null>(null);
   const [isLoadingFirmware, setIsLoadingFirmware] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   const { isFlashing, progress, flashStatus, flashError, startFlashing } =
     useFirmwareFlasher();
@@ -113,6 +114,9 @@ function FirmwareUpdate({
     }
     setLoadError(null);
 
+    const controller = new AbortController();
+    setAbortController(controller);
+
     try {
       if (selectedPort.readable || selectedPort.writable) {
         await selectedPort.close();
@@ -125,17 +129,28 @@ function FirmwareUpdate({
         stopBits: 1,
         flowControl: "none",
       });
-      await startFlashing(firmwareData);
+      await startFlashing(firmwareData, controller.signal);
     } catch (err) {
-      console.error("Error during port handling or starting flash:", err);
-      setLoadError(
-        `Port error: ${err instanceof Error ? err.message : String(err)}`
-      );
+      if (err instanceof DOMException && err.name === "AbortError") {
+        console.log("Flash cancelled by user.");
+      } else {
+        console.error("Error during port handling or starting flash:", err);
+        setLoadError(
+          `Port error: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
     } finally {
+      setAbortController(null);
       await selectedPort.close();
       if (onFlashComplete) {
         onFlashComplete();
       }
+    }
+  };
+
+  const handleCancelClick = () => {
+    if (abortController) {
+      abortController.abort();
     }
   };
 
@@ -167,17 +182,22 @@ function FirmwareUpdate({
       </div>
 
       {/* Flash Button - Enabled only when firmware is loaded and not flashing */}
-      <button
-        className="firmware-update-button flash"
-        onClick={handleFlashClick}
-        disabled={!canFlash}
-      >
-        {isFlashing
-          ? "Flashing..."
-          : isLoadingFirmware
-          ? "Loading Firmware..."
-          : "Flash Device"}
-      </button>
+      {!isFlashing ? (
+        <button
+          className="firmware-update-button flash"
+          onClick={handleFlashClick}
+          disabled={!canFlash}
+        >
+          {isLoadingFirmware ? "Loading Firmware..." : "Flash Device"}
+        </button>
+      ) : (
+        <button
+          className="firmware-update-button cancel"
+          onClick={handleCancelClick}
+        >
+          Cancel
+        </button>
+      )}
 
       {/* Progress Bar and Status */}
       {isFlashing && (

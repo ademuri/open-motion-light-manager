@@ -33,7 +33,11 @@ export class SerialService {
   /**
    * Executes a serial operation with a lock to prevent concurrent access.
    */
-  private async runOperation<T>(operation: () => Promise<T>): Promise<T> {
+  private async runOperation<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (signal?.aborted) {
+      throw signal.reason;
+    }
+
     const currentLock = this.operationLock;
     let releaseLock: () => void;
     this.operationLock = new Promise((resolve) => {
@@ -41,7 +45,21 @@ export class SerialService {
     });
 
     try {
-      await currentLock;
+      if (signal) {
+        await Promise.race([
+          currentLock,
+          new Promise((_, reject) => {
+            signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+          }),
+        ]);
+      } else {
+        await currentLock;
+      }
+
+      if (signal?.aborted) {
+        throw signal.reason;
+      }
+
       this.transport.clearLeftover();
       const result = await operation();
       return result;
@@ -56,15 +74,18 @@ export class SerialService {
    * Note: This assumes the port is already open and in the correct mode.
    */
   async sendProtobufRequest(request: SerialRequest, signal?: AbortSignal): Promise<SerialResponse> {
-    return this.runOperation(() => this.protobuf.sendRequest(request, signal));
+    return this.runOperation(() => this.protobuf.sendRequest(request, signal), signal);
   }
 
   /**
    * Runs an operation using the STM32 Bootloader protocol.
    * The callback receives the bootloader protocol instance.
    */
-  async runBootloaderOperation<T>(operation: (bootloader: Stm32BootloaderProtocol) => Promise<T>): Promise<T> {
-    return this.runOperation(() => operation(this.bootloader));
+  async runBootloaderOperation<T>(
+    operation: (bootloader: Stm32BootloaderProtocol) => Promise<T>,
+    signal?: AbortSignal
+  ): Promise<T> {
+    return this.runOperation(() => operation(this.bootloader), signal);
   }
 
   /**
@@ -74,5 +95,15 @@ export class SerialService {
    */
   get stm32(): Stm32BootloaderProtocol {
     return this.bootloader;
+  }
+
+  /**
+   * Resets the MCU using DTR/RTS signals.
+   */
+  async resetMcu(): Promise<void> {
+    // Reset to app mode (standard sequence used in this project)
+    await this.connection.setSignals({ dataTerminalReady: true, requestToSend: true });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await this.connection.setSignals({ dataTerminalReady: true, requestToSend: false });
   }
 }

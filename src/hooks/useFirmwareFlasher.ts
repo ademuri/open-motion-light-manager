@@ -7,7 +7,7 @@ interface FirmwareFlasherResult {
   progress: number; // Percentage 0-100
   flashStatus: string | null;
   flashError: string | null;
-  startFlashing: (firmwareData: ArrayBuffer) => Promise<void>;
+  startFlashing: (firmwareData: ArrayBuffer, signal?: AbortSignal) => Promise<void>;
 }
 
 function compareUint8Arrays(a: Uint8Array, b: Uint8Array): boolean {
@@ -27,7 +27,7 @@ export function useFirmwareFlasher(): FirmwareFlasherResult {
   const [flashError, setFlashError] = useState<string | null>(null);
 
   const startFlashing = useCallback(
-    async (firmwareData: ArrayBuffer) => {
+    async (firmwareData: ArrayBuffer, signal?: AbortSignal) => {
       if (!port || !service) {
         setFlashError("Serial port is not connected.");
         return;
@@ -53,35 +53,63 @@ export function useFirmwareFlasher(): FirmwareFlasherResult {
 
         // Boot0 and Reset toggling
         setFlashStatus("Entering bootloader mode...");
+        if (signal?.aborted) throw signal.reason;
         await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(resolve, 10);
+            signal?.addEventListener("abort", () => {
+                clearTimeout(timeoutId);
+                reject(signal.reason);
+            }, { once: true });
+        });
+        if (signal?.aborted) throw signal.reason;
         await port.setSignals({ dataTerminalReady: false, requestToSend: true });
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(resolve, 10);
+            signal?.addEventListener("abort", () => {
+                clearTimeout(timeoutId);
+                reject(signal.reason);
+            }, { once: true });
+        });
+        if (signal?.aborted) throw signal.reason;
         await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(resolve, 10);
+            signal?.addEventListener("abort", () => {
+                clearTimeout(timeoutId);
+                reject(signal.reason);
+            }, { once: true });
+        });
+        if (signal?.aborted) throw signal.reason;
 
         await service.runBootloaderOperation(async (stm32) => {
-          await stm32.init();
+          await stm32.init(signal);
           setFlashStatus("Bootloader acknowledged.");
 
-          const productId = await stm32.getProductId();
+          const productId = await stm32.getProductId(signal);
           if (productId !== CHIP_PARAMETERS.PRODUCT_ID) {
             throw new Error(`Incorrect product ID: 0x${productId.toString(16)} (expected 0x${CHIP_PARAMETERS.PRODUCT_ID.toString(16)})`);
           }
           setFlashStatus("Confirmed chip product ID");
 
-          const version = await stm32.getVersion();
+          const version = await stm32.getVersion(signal);
           console.log(`Bootloader version: ${version}`);
 
           setFlashStatus("Write unprotecting...");
-          await stm32.writeUnprotect();
+          await stm32.writeUnprotect(signal);
           
           // After unprotect, device might reset or need re-init
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          await stm32.init();
+          await new Promise((resolve, reject) => {
+              const timeoutId = setTimeout(resolve, 100);
+              signal?.addEventListener("abort", () => {
+                  clearTimeout(timeoutId);
+                  reject(signal.reason);
+              }, { once: true });
+          });
+          await stm32.init(signal);
 
           setFlashStatus("Erasing flash...");
-          await stm32.eraseAll();
+          await stm32.eraseAll(signal);
           setFlashStatus("Erased flash");
 
           setFlashStatus("Writing firmware...");
@@ -90,13 +118,15 @@ export function useFirmwareFlasher(): FirmwareFlasherResult {
           let currentAddress = CHIP_PARAMETERS.PROGRAM_FLASH_START_ADDRESS;
 
           while (bytesWritten < totalBytes) {
+            if (signal?.aborted) throw signal.reason;
+
             const chunk = new Uint8Array(firmwareData, bytesWritten, Math.min(writeChunkSize, totalBytes - bytesWritten));
             
             const currentProgress = Math.round((bytesWritten / totalBytes) * 50);
             setProgress(currentProgress);
             setFlashStatus(`Writing flash... ${currentProgress}%`);
 
-            await stm32.writeMemory(currentAddress, chunk);
+            await stm32.writeMemory(currentAddress, chunk, signal);
 
             bytesWritten += chunk.length;
             currentAddress += chunk.length;
@@ -108,13 +138,15 @@ export function useFirmwareFlasher(): FirmwareFlasherResult {
           let currentReadAddress = CHIP_PARAMETERS.PROGRAM_FLASH_START_ADDRESS;
 
           while (bytesVerified < totalBytes) {
+            if (signal?.aborted) throw signal.reason;
+
             const length = Math.min(readChunkSize, totalBytes - bytesVerified);
             
             const currentProgress = 50 + Math.round((bytesVerified / totalBytes) * 50);
             setProgress(currentProgress);
             setFlashStatus(`Verifying flash... ${currentProgress}%`);
 
-            const readData = await stm32.readMemory(currentReadAddress, length);
+            const readData = await stm32.readMemory(currentReadAddress, length, signal);
             const originalChunk = new Uint8Array(firmwareData, bytesVerified, length);
 
             if (!compareUint8Arrays(readData, originalChunk)) {
@@ -124,7 +156,7 @@ export function useFirmwareFlasher(): FirmwareFlasherResult {
             bytesVerified += length;
             currentReadAddress += length;
           }
-        });
+        }, signal);
 
         setProgress(100);
         setFlashStatus("Verification successful. Resetting device...");
@@ -143,7 +175,7 @@ export function useFirmwareFlasher(): FirmwareFlasherResult {
           await port.setSignals({ dataTerminalReady: true, requestToSend: true });
           await new Promise((resolve) => setTimeout(resolve, 50));
           await port.setSignals({ dataTerminalReady: true, requestToSend: false });
-        } catch (_e) { /* ignore reset error */ }
+        } catch { /* ignore reset error */ }
       } finally {
         setIsFlashing(false);
       }
