@@ -135,39 +135,44 @@ function AppContent({ selectedPort, setSelectedPort }: {
       <SerialPortSelector
         setSelectedPortOnParent={setSelectedPort}
       ></SerialPortSelector>
-      <div className="status-section">
-        {loading && <div className="loading-indicator">Refreshing...</div>}
-        {error.length > 0 && selectedPort !== null ? (
-          <div className="error-message">{error}</div>
-        ) : null}
-        {response === null && selectedPort !== null && portConnected ? (
-          <div className="loading-configuration">Loading configuration...</div>
-        ) : null}
-        {response !== null && response.config != null && (
-          <DeviceConfig
-            key={configCounter}
-            config={response.config}
-            setConfig={sendConfig}
-            editable={portConnected}
-          />
-        )}
-        {response !== null ? (
-          <DeviceStatus connected={portConnected} status={status} />
-        ) : null}
-        {selectedPort !== null && (
-          <div className="status-actions">
-            <button onClick={sendInitialRequest} disabled={loading}>Refresh</button>
-            <button onClick={resetMcu} disabled={loading}>Reset MCU</button>
-          </div>
-        )}
-      </div>
-      <div className="actions-column">
-        {
-          <FirmwareUpdate
-            selectedPort={selectedPort}
-            onFlashComplete={openPort}
-          />
-        }
+      <div className="main-content">
+        <div className="status-section">
+          {loading && <div className="loading-indicator">Refreshing...</div>}
+          {!loading && <div className="loading-indicator"></div>}
+          {error.length > 0 && selectedPort !== null ? (
+            <div className="error-message">{error}</div>
+          ) : (
+            <div className="error-message"></div>
+          )}
+          {response === null && selectedPort !== null && portConnected ? (
+            <div className="loading-configuration">Loading configuration...</div>
+          ) : null}
+          {response !== null && response.config != null && (
+            <DeviceConfig
+              key={configCounter}
+              config={response.config}
+              setConfig={sendConfig}
+              editable={portConnected}
+            />
+          )}
+          {response !== null ? (
+            <DeviceStatus connected={portConnected} status={status} />
+          ) : null}
+          {selectedPort !== null && (
+            <div className="status-actions">
+              <button onClick={sendInitialRequest} disabled={loading}>Refresh</button>
+              <button onClick={resetMcu} disabled={loading}>Reset MCU</button>
+            </div>
+          )}
+        </div>
+        <div className="actions-column">
+          {
+            <FirmwareUpdate
+              selectedPort={selectedPort}
+              onFlashComplete={openPort}
+            />
+          }
+        </div>
       </div>
     </div>
   );
