@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SerialService } from "./SerialService";
-import { ConnectionError } from "./errors";
 
 describe("SerialService Concurrent Operations", () => {
   let mockPort: any;

@@ -12,14 +12,15 @@ describe("ProtobufProtocol", () => {
     const protocol = new ProtobufProtocol(mockTransport);
     
     const request = SerialRequest.create({
-        getDeviceConfig: {}
+        requestConfig: true
     });
     
     const response = SerialResponse.create({
-        deviceConfig: {
-            brightness: 50,
-            motionSensitivity: 10,
-            onDuration: 30
+        config: {
+            version: 1,
+            ledDutyCycle: 50,
+            motionSensitivity: 1,
+            motionTimeoutSeconds: 30
         }
     });
     const responseBinary = SerialResponse.toBinary(response);
