@@ -54,6 +54,7 @@ function AppContent({ selectedPort, setSelectedPort }: {
     error,
     loading,
     sendRequest,
+    resetMcu,
   } = useSerialCommunication();
 
   useEffect(() => {
@@ -66,7 +67,7 @@ function AppContent({ selectedPort, setSelectedPort }: {
     if (loading) return;
     const request = SerialRequest.create();
     request.requestConfig = true;
-    sendRequest(request);
+    sendRequest(request).catch(() => {});
   }, [sendRequest, loading]);
 
   const sendConfig = useCallback(
@@ -75,7 +76,7 @@ function AppContent({ selectedPort, setSelectedPort }: {
       const request = SerialRequest.create();
       request.requestConfig = true;
       request.config = config;
-      sendRequest(request);
+      sendRequest(request).catch(() => {});
     },
     [sendRequest, loading]
   );
@@ -92,24 +93,42 @@ function AppContent({ selectedPort, setSelectedPort }: {
     }
   }, [portConnected, sendInitialRequest]);
 
-  // Refresh status on error
+  const lastFailureTimeRef = useRef<number | null>(null);
+
+  // Refresh status on error and reset if failing for too long
   useEffect(() => {
     const intervalId = setInterval(() => {
       if (portConnected && error.length > 0 && !loading) {
+        if (lastFailureTimeRef.current === null) {
+          lastFailureTimeRef.current = Date.now();
+        } else if (Date.now() - lastFailureTimeRef.current > 5000) {
+          console.log("Communication failure for > 5s, resetting MCU...");
+          resetMcu();
+          lastFailureTimeRef.current = Date.now(); // Reset the timer so we don't spam resets
+        }
         sendInitialRequest();
+      } else {
+        lastFailureTimeRef.current = null;
       }
     }, 2000);
 
     return () => {
       clearInterval(intervalId);
     };
-  }, [portConnected, error, loading, sendInitialRequest]);
+  }, [portConnected, error, loading, sendInitialRequest, resetMcu]);
 
   useEffect(() => {
     if (response?.status) {
       setStatus(response.status);
     }
   }, [response]);
+
+  const [configCounter, setConfigCounter] = useState(0);
+  useEffect(() => {
+    if (response?.config) {
+      setConfigCounter((c) => c + 1);
+    }
+  }, [response?.config]);
 
   return (
     <div className="app-container">
@@ -126,6 +145,7 @@ function AppContent({ selectedPort, setSelectedPort }: {
         ) : null}
         {response !== null && response.config != null && (
           <DeviceConfig
+            key={configCounter}
             config={response.config}
             setConfig={sendConfig}
             editable={portConnected}
@@ -135,7 +155,10 @@ function AppContent({ selectedPort, setSelectedPort }: {
           <DeviceStatus connected={portConnected} status={status} />
         ) : null}
         {selectedPort !== null && (
-          <button onClick={sendInitialRequest} disabled={loading}>Refresh</button>
+          <div className="status-actions">
+            <button onClick={sendInitialRequest} disabled={loading}>Refresh</button>
+            <button onClick={resetMcu} disabled={loading}>Reset MCU</button>
+          </div>
         )}
       </div>
       <div className="actions-column">

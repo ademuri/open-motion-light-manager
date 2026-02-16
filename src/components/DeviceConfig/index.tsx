@@ -8,7 +8,7 @@ import "./DeviceConfig.css";
 import { useState, useEffect } from "react";
 
 interface DeviceConfigProps {
-  config: ConfigPb | null;
+  config: ConfigPb;
   setConfig: (config: ConfigPb) => void;
   editable?: boolean;
 }
@@ -21,7 +21,26 @@ function DeviceConfig({
   setConfig,
   editable = true,
 }: DeviceConfigProps) {
-  const [localConfig, setLocalConfig] = useState<ConfigPb | null>(null);
+  const [localConfig, setLocalConfig] = useState<ConfigPb>(() => {
+    // Ensure all expected fields exist, potentially setting defaults if needed
+    // This helps prevent errors if the config from the device is missing fields
+    const defaults: Partial<ConfigPb> = {
+      version: 1,
+      brightnessMode: BrightnessMode.DISABLED,
+      autoBrightnessThreshold: 120,
+      proximityMode: ProximityMode.DISABLED,
+      proximityToggleTimeoutSeconds: 600,
+      proximityThreshold: 300,
+      motionTimeoutSeconds: 10,
+      ledDutyCycle: 255,
+      lowBatteryCutoffMillivolts: 3000,
+      lowBatteryHysteresisThresholdMillivolts: 3200,
+      rampUpTimeMs: 0, // Default for ramp_up_time_ms
+      rampDownTimeMs: 0, // Default for ramp_down_time_ms
+      motionSensitivity: MotionSensitivity.ONE,
+    };
+    return { ...defaults, ...structuredClone(config) } as ConfigPb;
+  });
 
   // Initialize viewMode state from localStorage or default to 'simple'
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -33,32 +52,6 @@ function DeviceConfig({
     // Otherwise, return the default
     return 'simple';
   });
-
-  useEffect(() => {
-    // Create a deep copy to avoid modifying the original prop directly
-    if (config) {
-      // Ensure all expected fields exist, potentially setting defaults if needed
-      // This helps prevent errors if the config from the device is missing fields
-      const defaults: Partial<ConfigPb> = {
-        version: 1,
-        brightnessMode: BrightnessMode.DISABLED,
-        autoBrightnessThreshold: 120,
-        proximityMode: ProximityMode.DISABLED,
-        proximityToggleTimeoutSeconds: 600,
-        proximityThreshold: 300,
-        motionTimeoutSeconds: 10,
-        ledDutyCycle: 255,
-        lowBatteryCutoffMillivolts: 3000,
-        lowBatteryHysteresisThresholdMillivolts: 3200,
-        rampUpTimeMs: 0, // Default for ramp_up_time_ms
-        rampDownTimeMs: 0, // Default for ramp_down_time_ms
-        motionSensitivity: MotionSensitivity.ONE,
-      };
-      setLocalConfig({ ...defaults, ...JSON.parse(JSON.stringify(config)) });
-    } else {
-      setLocalConfig(null);
-    }
-  }, [config]);
 
   // Save viewMode to localStorage whenever it changes
   useEffect(() => {
@@ -73,13 +66,7 @@ function DeviceConfig({
     const value = event.target.value;
     const newValue = value === "" ? 0 : parseInt(value, 10);
     if (!isNaN(newValue)) {
-      setLocalConfig((prevConfig) => {
-        if (prevConfig) {
-          const updatedConfig = { ...prevConfig, [fieldName]: newValue };
-          return updatedConfig;
-        }
-        return prevConfig;
-      });
+      setLocalConfig((prevConfig) => ({ ...prevConfig, [fieldName]: newValue }));
     }
   };
 
@@ -90,13 +77,7 @@ function DeviceConfig({
   ) => {
     const newValue = parseInt(event.target.value, 10);
     if (!isNaN(newValue)) {
-      setLocalConfig((prevConfig) => {
-        if (prevConfig) {
-          const updatedConfig = { ...prevConfig, [fieldName]: newValue };
-          return updatedConfig;
-        }
-        return prevConfig;
-      });
+      setLocalConfig((prevConfig) => ({ ...prevConfig, [fieldName]: newValue }));
     }
   };
 
@@ -109,16 +90,10 @@ function DeviceConfig({
     const parsedDisplayValue = displayValue === "" ? 0 : parseInt(displayValue, 10);
     if (!isNaN(parsedDisplayValue)) {
       const storedValue = parsedDisplayValue * 4; // Scale the input value by 4 for storage
-      setLocalConfig((prevConfig) => {
-        if (prevConfig) {
-          const updatedConfig = {
-            ...prevConfig,
-            autoBrightnessThreshold: storedValue, // Store the scaled value
-          };
-          return updatedConfig;
-        }
-        return prevConfig;
-      });
+      setLocalConfig((prevConfig) => ({
+        ...prevConfig,
+        autoBrightnessThreshold: storedValue, // Store the scaled value
+      }));
     }
   };
 
@@ -129,29 +104,17 @@ function DeviceConfig({
     const value = event.target.value;
     const newValue = value === "" ? 0 : parseInt(value, 10);
     if (!isNaN(newValue)) {
-      setLocalConfig((prevConfig) => {
-        if (prevConfig) {
-          const updatedConfig = {
-            ...prevConfig,
-            hardwareVersion: {
-              major: prevConfig.hardwareVersion?.major ?? 0,
-              minor: prevConfig.hardwareVersion?.minor ?? 0,
-              subrevision: prevConfig.hardwareVersion?.subrevision ?? 0,
-              [field]: newValue,
-            },
-          };
-          return updatedConfig;
-        }
-        return prevConfig;
-      });
+      setLocalConfig((prevConfig) => ({
+        ...prevConfig,
+        hardwareVersion: {
+          major: prevConfig.hardwareVersion?.major ?? 0,
+          minor: prevConfig.hardwareVersion?.minor ?? 0,
+          subrevision: prevConfig.hardwareVersion?.subrevision ?? 0,
+          [field]: newValue,
+        },
+      }));
     }
   };
-
-  if (localConfig === null) {
-    return (
-      <div className="device-config-container">Loading configuration...</div>
-    );
-  }
 
   const handleBrightnessModeChange = (
     event: React.ChangeEvent<HTMLSelectElement>
@@ -409,7 +372,7 @@ function DeviceConfig({
 
         {/* Save Button */}
         <button
-          onClick={() => localConfig && setConfig(localConfig)}
+          onClick={() => setConfig(localConfig)}
           className="device-config-save-button"
           disabled={!editable}
         >
