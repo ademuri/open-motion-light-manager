@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { CHIP_PARAMETERS } from "../services/bootloader/constants";
-import { useSerialService } from "./useSerialPort";
+import { useSerialService, useSerialPort } from "./useSerialPort";
 
 interface FirmwareFlasherResult {
   isFlashing: boolean;
@@ -18,10 +18,9 @@ function compareUint8Arrays(a: Uint8Array, b: Uint8Array): boolean {
   return true;
 }
 
-export function useFirmwareFlasher(
-  port: SerialPort | null
-): FirmwareFlasherResult {
-  const service = useSerialService(port);
+export function useFirmwareFlasher(): FirmwareFlasherResult {
+  const service = useSerialService();
+  const port = useSerialPort();
   const [isFlashing, setIsFlashing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [flashStatus, setFlashStatus] = useState<string | null>(null);

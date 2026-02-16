@@ -11,12 +11,16 @@ export class SerialTransport {
 
   constructor(private connection: SerialConnection) {}
 
+  clearLeftover(): void {
+    this.leftover = null;
+  }
+
   async write(data: Uint8Array): Promise<void> {
     const writer = this.connection.getWriter();
     try {
       await writer.write(data);
     } finally {
-      this.connection.releaseLocks();
+      this.connection.releaseWriter();
     }
   }
 

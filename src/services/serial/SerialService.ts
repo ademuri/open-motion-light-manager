@@ -42,6 +42,7 @@ export class SerialService {
 
     try {
       await currentLock;
+      this.transport.clearLeftover();
       const result = await operation();
       return result;
     } finally {

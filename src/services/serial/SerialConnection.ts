@@ -35,7 +35,10 @@ export class SerialConnection {
   }
 
   getReader(): ReadableStreamDefaultReader<Uint8Array> {
-    if (!this.port.readable) throw new ConnectionError("Port not readable");
+    if (!this.port.readable) {
+        this.reader = null;
+        throw new ConnectionError("Port not readable");
+    }
     if (!this.reader) {
       this.reader = this.port.readable.getReader();
     }
@@ -43,21 +46,40 @@ export class SerialConnection {
   }
 
   getWriter(): WritableStreamDefaultWriter<Uint8Array> {
-    if (!this.port.writable) throw new ConnectionError("Port not writable");
+    if (!this.port.writable) {
+        this.writer = null;
+        throw new ConnectionError("Port not writable");
+    }
     if (!this.writer) {
       this.writer = this.port.writable.getWriter();
     }
     return this.writer;
   }
 
-  releaseLocks() {
+  releaseReader() {
     if (this.reader) {
-      this.reader.releaseLock();
+      try {
+        this.reader.releaseLock();
+      } catch (e) {
+        // Ignore errors if already released
+      }
       this.reader = null;
     }
+  }
+
+  releaseWriter() {
     if (this.writer) {
-      this.writer.releaseLock();
+      try {
+        this.writer.releaseLock();
+      } catch (e) {
+        // Ignore errors if already released
+      }
       this.writer = null;
     }
+  }
+
+  releaseLocks() {
+    this.releaseReader();
+    this.releaseWriter();
   }
 }

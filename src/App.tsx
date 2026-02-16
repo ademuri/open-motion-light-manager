@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import "./App.css";
 import SerialPortSelector from "./components/SerialPortSelector";
-import { useSerialCommunication, useSerialService } from "./hooks/useSerialPort";
+import { useSerialCommunication, useSerialService, SerialProvider } from "./hooks/useSerialPort";
 import { ConfigPb, SerialRequest, StatusPb } from "../proto_out/serial";
 import DeviceStatus from "./components/DeviceStatus";
 import DeviceConfig from "./components/DeviceConfig";
 import FirmwareUpdate from "./components/FirmwareUpdate";
 
-function App() {
-  const [selectedPort, setSelectedPort] = useState<SerialPort | null>(null);
-  const service = useSerialService(selectedPort);
+function AppContent({ selectedPort, setSelectedPort }: { 
+  selectedPort: SerialPort | null, 
+  setSelectedPort: (port: SerialPort | null) => void 
+}) {
+  const service = useSerialService();
   const [portConnected, setPortConnected] = useState(false);
   const portOpeningRef = useRef(false);
   const [status, setStatus] = useState<StatusPb | null>(null);
@@ -47,23 +49,12 @@ function App() {
     openPort();
   }, [openPort]);
 
-  // useEffect(() => {
-  //   if (selectedPort !== null && !portConnected) {
-  //     const intervalId = setInterval(() => {
-  //       console.log("Retrying port connection...");
-  //       openPort();
-  //     }, 1000);
-
-  //     return () => clearInterval(intervalId);
-  //   }
-  // }, [selectedPort, portConnected, openPort]);
-
   const {
     response,
     error,
     loading,
     sendRequest,
-  } = useSerialCommunication(selectedPort);
+  } = useSerialCommunication();
 
   useEffect(() => {
     navigator.serial.addEventListener("disconnect", () => {
@@ -156,6 +147,16 @@ function App() {
         }
       </div>
     </div>
+  );
+}
+
+function App() {
+  const [selectedPort, setSelectedPort] = useState<SerialPort | null>(null);
+
+  return (
+    <SerialProvider port={selectedPort}>
+      <AppContent selectedPort={selectedPort} setSelectedPort={setSelectedPort} />
+    </SerialProvider>
   );
 }
 

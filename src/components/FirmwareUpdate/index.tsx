@@ -49,7 +49,7 @@ function FirmwareUpdate({
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const { isFlashing, progress, flashStatus, flashError, startFlashing } =
-    useFirmwareFlasher(selectedPort);
+    useFirmwareFlasher();
 
   // Effect to fetch firmware when URL changes
   useEffect(() => {
