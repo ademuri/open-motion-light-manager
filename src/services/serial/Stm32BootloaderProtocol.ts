@@ -68,6 +68,8 @@ export class Stm32BootloaderProtocol {
       await this.expectAck(signal, 10000); // Wait for mass erase completion
   }
 
+  // Erases all flash pages. Erases page-by-page because the `ERASE` command is
+  // not supported on the MCU we use.
   async eraseAll(signal?: AbortSignal): Promise<void> {
       await this.transport.write(COMMANDS.ERASE_EXTENDED);
       await this.expectAck(signal);
