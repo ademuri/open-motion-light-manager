@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SerialService } from "./SerialService";
 
 describe("SerialService Concurrent Operations", () => {
-  let mockPort: any;
+  let mockPort: SerialPort;
   let service: SerialService;
 
   beforeEach(() => {
@@ -16,7 +16,7 @@ describe("SerialService Concurrent Operations", () => {
       open: vi.fn().mockResolvedValue(undefined),
       close: vi.fn().mockResolvedValue(undefined),
       setSignals: vi.fn().mockResolvedValue(undefined),
-    };
+    } as unknown as SerialPort;
     service = new SerialService(mockPort);
   });
 
@@ -54,8 +54,8 @@ describe("SerialService Concurrent Operations", () => {
   });
 
   it("should handle port closure during an operation", async () => {
-    let resolveRead: (value: any) => void;
-    const readPromise = new Promise((resolve) => {
+    let resolveRead: (value: ReadableStreamReadResult<Uint8Array>) => void;
+    const readPromise = new Promise<ReadableStreamReadResult<Uint8Array>>((resolve) => {
       resolveRead = resolve;
     });
 
@@ -64,7 +64,7 @@ describe("SerialService Concurrent Operations", () => {
       releaseLock: vi.fn(),
       cancel: vi.fn().mockResolvedValue(undefined),
     };
-    mockPort.readable.getReader.mockReturnValue(mockReader);
+    vi.mocked(mockPort.readable!.getReader).mockReturnValue(mockReader as unknown as ReadableStreamDefaultReader<Uint8Array>);
 
     const flashPromise = service.runBootloaderOperation(async (stm32) => {
         return await stm32.expectAck();
@@ -88,7 +88,7 @@ describe("SerialService Concurrent Operations", () => {
       releaseLock: vi.fn(),
       cancel: vi.fn().mockResolvedValue(undefined),
     };
-    mockPort.readable.getReader.mockReturnValue(mockReader);
+    vi.mocked(mockPort.readable!.getReader).mockReturnValue(mockReader as unknown as ReadableStreamDefaultReader<Uint8Array>);
 
     // First operation reads only 1 byte, leaving [0x11, 0x22] in leftovers
     await service.runBootloaderOperation(async (stm32) => {

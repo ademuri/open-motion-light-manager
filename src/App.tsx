@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import "./App.css";
 import SerialPortSelector from "./components/SerialPortSelector";
-import { useSerialCommunication, useSerialService, SerialProvider } from "./hooks/useSerialPort";
+import { useSerialCommunication, useSerialService } from "./hooks/useSerialPort";
+import { SerialProvider } from "./context/SerialProvider";
 import { ConfigPb, SerialRequest, StatusPb } from "../proto_out/serial";
 import DeviceStatus from "./components/DeviceStatus";
 import DeviceConfig from "./components/DeviceConfig";

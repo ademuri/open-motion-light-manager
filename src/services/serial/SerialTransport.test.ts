@@ -25,7 +25,7 @@ describe("SerialTransport", () => {
     const mockPort = {
       readable: mockReadable,
       writable: {},
-    } as any as SerialPort;
+    } as unknown as SerialPort;
 
     const connection = new SerialConnection(mockPort);
     const transport = new SerialTransport(connection);
@@ -56,7 +56,7 @@ describe("SerialTransport", () => {
     const mockPort = {
       readable: mockReadable,
       writable: {},
-    } as any as SerialPort;
+    } as unknown as SerialPort;
 
     const connection = new SerialConnection(mockPort);
     const transport = new SerialTransport(connection);
@@ -95,7 +95,7 @@ describe("SerialTransport", () => {
       const mockPort = {
         readable: mockReadable,
         writable: {},
-      } as any as SerialPort;
+      } as unknown as SerialPort;
 
       const connection = new SerialConnection(mockPort);
       const transport = new SerialTransport(connection);
