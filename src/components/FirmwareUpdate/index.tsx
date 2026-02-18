@@ -13,37 +13,12 @@ interface FirmwareUpdateProps {
   onFlashComplete?: () => void;
 }
 
-// URL is relative to the `public` directory - NO leading slash
-const availableVersions: FirmwareVersion[] = [
-  {
-    version: "0.1.6",
-    url: "firmware-v0.1.6.bin",
-  },
-  {
-    version: "0.1.5",
-    url: "firmware-v0.1.5.bin",
-  },
-  {
-    version: "0.1.4",
-    url: "firmware-v0.1.4.bin",
-  },
-  {
-    version: "0.1.3",
-    url: "firmware-v0.1.3.bin",
-  },
-  {
-    version: "0.1.2",
-    url: "firmware-v0.1.2.bin",
-  },
-];
-
 function FirmwareUpdate({
   selectedPort,
   onFlashComplete,
 }: FirmwareUpdateProps) {
-  const [selectedFirmwareUrl, setSelectedFirmwareUrl] = useState<string>(
-    availableVersions[0]?.url ?? ""
-  );
+  const [availableVersions, setAvailableVersions] = useState<FirmwareVersion[]>([]);
+  const [selectedFirmwareUrl, setSelectedFirmwareUrl] = useState<string>("");
   const [firmwareData, setFirmwareData] = useState<ArrayBuffer | null>(null);
   const [isLoadingFirmware, setIsLoadingFirmware] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -51,6 +26,27 @@ function FirmwareUpdate({
 
   const { isFlashing, progress, flashStatus, flashError, startFlashing } =
     useFirmwareFlasher();
+
+  // Effect to fetch firmware manifest on mount
+  useEffect(() => {
+    const fetchManifest = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.BASE_URL}firmware-manifest.json`);
+        if (!response.ok) {
+          throw new Error("Failed to load firmware manifest");
+        }
+        const manifest: FirmwareVersion[] = await response.json();
+        setAvailableVersions(manifest);
+        if (manifest.length > 0) {
+          setSelectedFirmwareUrl(manifest[0].url);
+        }
+      } catch (error) {
+        console.error("Failed to load firmware manifest:", error);
+        setLoadError("Failed to load firmware manifest.");
+      }
+    };
+    fetchManifest();
+  }, []);
 
   // Effect to fetch firmware when URL changes
   useEffect(() => {
