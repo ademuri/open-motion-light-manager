@@ -94,6 +94,30 @@ describe("Stm32BootloaderProtocol", () => {
       expect(mockTransport.readExact).toHaveBeenLastCalledWith(1, { timeout: 10000, signal: undefined });
   });
 
+  it("should erase specific pages correctly", async () => {
+      const mockTransport = {
+          write: vi.fn().mockResolvedValue(undefined),
+          readExact: vi.fn().mockResolvedValue(new Uint8Array([BOOTLOADER_PROTOCOL.ACK])),
+      } as unknown as SerialTransport;
+
+      const protocol = new Stm32BootloaderProtocol(mockTransport);
+      await protocol.erasePages([1, 5, 10]);
+      
+      expect(mockTransport.write).toHaveBeenCalledTimes(2);
+      // Check the second write call (page data)
+      const sentPageData = vi.mocked(mockTransport.write).mock.calls[1][0];
+      expect(sentPageData[0]).toBe(0x00); // High byte of 2 (3 pages - 1)
+      expect(sentPageData[1]).toBe(0x02); // Low byte of 2
+      expect(sentPageData[2]).toBe(0x00); // Page 1 high
+      expect(sentPageData[3]).toBe(0x01); // Page 1 low
+      expect(sentPageData[4]).toBe(0x00); // Page 5 high
+      expect(sentPageData[5]).toBe(0x05); // Page 5 low
+      expect(sentPageData[6]).toBe(0x00); // Page 10 high
+      expect(sentPageData[7]).toBe(0x0A); // Page 10 low
+      
+      expect(mockTransport.readExact).toHaveBeenLastCalledWith(1, { timeout: 10000, signal: undefined });
+  });
+
   it("should write memory correctly", async () => {
       const mockTransport = {
           write: vi.fn().mockResolvedValue(undefined),

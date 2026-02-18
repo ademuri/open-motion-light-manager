@@ -68,27 +68,40 @@ export class Stm32BootloaderProtocol {
       await this.expectAck(signal, 10000); // Wait for mass erase completion
   }
 
-  // Erases all flash pages. Erases page-by-page because the `ERASE` command is
-  // not supported on the MCU we use.
-  async eraseAll(signal?: AbortSignal): Promise<void> {
+  /**
+   * Erases specific flash pages.
+   * @param pages Array of page indices to erase.
+   * @param signal AbortSignal for cancellation.
+   */
+  async erasePages(pages: number[], signal?: AbortSignal): Promise<void> {
+      if (pages.length === 0) return;
+
       await this.transport.write(COMMANDS.ERASE_EXTENDED);
       await this.expectAck(signal);
       
-      const numPages = Math.ceil(CHIP_PARAMETERS.PROGRAM_FLASH_SIZE / CHIP_PARAMETERS.FLASH_PAGE_SIZE) - 1;
-      const pageData = new Uint8Array(2 + (numPages + 1) * 2);
+      const numPages = pages.length - 1;
+      const pageData = new Uint8Array(2 + pages.length * 2);
       
       // Number of pages (2 bytes, N-1)
       pageData[0] = numPages >> 8;
       pageData[1] = numPages & 0xFF;
       
       // Page indices (2 bytes each)
-      for (let n = 0; n <= numPages; n++) {
-          pageData[2 + n * 2] = n >> 8;
-          pageData[2 + n * 2 + 1] = n & 0xFF;
+      for (let i = 0; i < pages.length; i++) {
+          pageData[2 + i * 2] = pages[i] >> 8;
+          pageData[2 + i * 2 + 1] = pages[i] & 0xFF;
       }
 
       await this.transport.write(this.appendChecksum(pageData));
       await this.expectAck(signal, 10000);
+  }
+
+  // Erases all flash pages. Erases page-by-page because the `ERASE` command is
+  // not supported on the MCU we use.
+  async eraseAll(signal?: AbortSignal): Promise<void> {
+      const numPages = Math.ceil(CHIP_PARAMETERS.PROGRAM_FLASH_SIZE / CHIP_PARAMETERS.FLASH_PAGE_SIZE);
+      const pages = Array.from({ length: numPages }, (_, i) => i);
+      await this.erasePages(pages, signal);
   }
 
   async writeMemory(address: number, data: Uint8Array, signal?: AbortSignal): Promise<void> {

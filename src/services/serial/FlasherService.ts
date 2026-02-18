@@ -82,7 +82,9 @@ export class FlasherService {
 
         // 4. Erasing
         onProgress({ state: 'erasing', progress: 0, message: 'Erasing flash...' });
-        await stm32.eraseAll(signal);
+        const numPagesToErase = Math.ceil(totalBytes / CHIP_PARAMETERS.FLASH_PAGE_SIZE);
+        const pagesToErase = Array.from({ length: numPagesToErase }, (_, i) => i);
+        await stm32.erasePages(pagesToErase, signal);
 
         // 5. Writing
         onProgress({ state: 'writing', progress: 0, message: 'Writing firmware...' });
