@@ -1,6 +1,6 @@
-import { useState, useCallback } from "react";
-import { CHIP_PARAMETERS } from "../services/bootloader/constants";
-import { useSerialService, useSerialPort } from "./useSerialPort";
+import { useState, useCallback, useMemo } from "react";
+import { useSerialService } from "./useSerialPort";
+import { FlasherService, FlasherProgress } from "../services/serial/FlasherService";
 
 interface FirmwareFlasherResult {
   isFlashing: boolean;
@@ -10,34 +10,27 @@ interface FirmwareFlasherResult {
   startFlashing: (firmwareData: ArrayBuffer, signal?: AbortSignal) => Promise<void>;
 }
 
-function compareUint8Arrays(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-}
-
 export function useFirmwareFlasher(): FirmwareFlasherResult {
   const service = useSerialService();
-  const port = useSerialPort();
   const [isFlashing, setIsFlashing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [flashStatus, setFlashStatus] = useState<string | null>(null);
   const [flashError, setFlashError] = useState<string | null>(null);
 
+  const flasher = useMemo(() => (service ? new FlasherService(service) : null), [service]);
+
   const startFlashing = useCallback(
     async (firmwareData: ArrayBuffer, signal?: AbortSignal) => {
-      if (!port || !service) {
+      if (!service || !flasher) {
         setFlashError("Serial port is not connected.");
         return;
       }
-      // Note: We expect the port to be opened with correct settings (even parity) 
-      // by the caller (FirmwareUpdate component) for now.
+      
       if (!service.isOpened) {
         setFlashError("Serial port is not open.");
         return;
       }
+      
       if (isFlashing) {
         setFlashError("Flashing process already in progress.");
         return;
@@ -48,125 +41,16 @@ export function useFirmwareFlasher(): FirmwareFlasherResult {
       setFlashStatus("Starting firmware flash...");
       setFlashError(null);
 
+      const handleProgress = (p: FlasherProgress) => {
+        setProgress(p.progress);
+        setFlashStatus(p.message);
+        if (p.state === 'error') {
+           setFlashError(p.message);
+        }
+      };
+
       try {
-        const totalBytes = firmwareData.byteLength;
-
-        // Boot0 and Reset toggling
-        setFlashStatus("Entering bootloader mode...");
-        if (signal?.aborted) throw signal.reason;
-        await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-        await new Promise((resolve, reject) => {
-            const timeoutId = setTimeout(resolve, 10);
-            signal?.addEventListener("abort", () => {
-                clearTimeout(timeoutId);
-                reject(signal.reason);
-            }, { once: true });
-        });
-        if (signal?.aborted) throw signal.reason;
-        await port.setSignals({ dataTerminalReady: false, requestToSend: true });
-        await new Promise((resolve, reject) => {
-            const timeoutId = setTimeout(resolve, 10);
-            signal?.addEventListener("abort", () => {
-                clearTimeout(timeoutId);
-                reject(signal.reason);
-            }, { once: true });
-        });
-        if (signal?.aborted) throw signal.reason;
-        await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-        await new Promise((resolve, reject) => {
-            const timeoutId = setTimeout(resolve, 10);
-            signal?.addEventListener("abort", () => {
-                clearTimeout(timeoutId);
-                reject(signal.reason);
-            }, { once: true });
-        });
-        if (signal?.aborted) throw signal.reason;
-
-        await service.runBootloaderOperation(async (stm32) => {
-          await stm32.init(signal);
-          setFlashStatus("Bootloader acknowledged.");
-
-          const productId = await stm32.getProductId(signal);
-          if (productId !== CHIP_PARAMETERS.PRODUCT_ID) {
-            throw new Error(`Incorrect product ID: 0x${productId.toString(16)} (expected 0x${CHIP_PARAMETERS.PRODUCT_ID.toString(16)})`);
-          }
-          setFlashStatus("Confirmed chip product ID");
-
-          const version = await stm32.getVersion(signal);
-          console.log(`Bootloader version: ${version}`);
-
-          setFlashStatus("Write unprotecting...");
-          await stm32.writeUnprotect(signal);
-          
-          // After unprotect, device might reset or need re-init
-          await new Promise((resolve, reject) => {
-              const timeoutId = setTimeout(resolve, 100);
-              signal?.addEventListener("abort", () => {
-                  clearTimeout(timeoutId);
-                  reject(signal.reason);
-              }, { once: true });
-          });
-          await stm32.init(signal);
-
-          setFlashStatus("Erasing flash...");
-          await stm32.eraseAll(signal);
-          setFlashStatus("Erased flash");
-
-          setFlashStatus("Writing firmware...");
-          const writeChunkSize = 256;
-          let bytesWritten = 0;
-          let currentAddress = CHIP_PARAMETERS.PROGRAM_FLASH_START_ADDRESS;
-
-          while (bytesWritten < totalBytes) {
-            if (signal?.aborted) throw signal.reason;
-
-            const chunk = new Uint8Array(firmwareData, bytesWritten, Math.min(writeChunkSize, totalBytes - bytesWritten));
-            
-            const currentProgress = Math.round((bytesWritten / totalBytes) * 50);
-            setProgress(currentProgress);
-            setFlashStatus(`Writing flash... ${currentProgress}%`);
-
-            await stm32.writeMemory(currentAddress, chunk, signal);
-
-            bytesWritten += chunk.length;
-            currentAddress += chunk.length;
-          }
-
-          setFlashStatus("Verifying flash...");
-          const readChunkSize = 256;
-          let bytesVerified = 0;
-          let currentReadAddress = CHIP_PARAMETERS.PROGRAM_FLASH_START_ADDRESS;
-
-          while (bytesVerified < totalBytes) {
-            if (signal?.aborted) throw signal.reason;
-
-            const length = Math.min(readChunkSize, totalBytes - bytesVerified);
-            
-            const currentProgress = 50 + Math.round((bytesVerified / totalBytes) * 50);
-            setProgress(currentProgress);
-            setFlashStatus(`Verifying flash... ${currentProgress}%`);
-
-            const readData = await stm32.readMemory(currentReadAddress, length, signal);
-            const originalChunk = new Uint8Array(firmwareData, bytesVerified, length);
-
-            if (!compareUint8Arrays(readData, originalChunk)) {
-                throw new Error(`Verification failed at address 0x${currentReadAddress.toString(16)}`);
-            }
-
-            bytesVerified += length;
-            currentReadAddress += length;
-          }
-        }, signal);
-
-        setProgress(100);
-        setFlashStatus("Verification successful. Resetting device...");
-
-        // Reset to app mode
-        await port.setSignals({ dataTerminalReady: true, requestToSend: true });
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        await port.setSignals({ dataTerminalReady: true, requestToSend: false });
-        setFlashStatus("Device reset. Flash complete.");
-
+        await flasher.flash(firmwareData, handleProgress, signal);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           console.log("Firmware flashing cancelled by user.");
@@ -174,17 +58,11 @@ export function useFirmwareFlasher(): FirmwareFlasherResult {
           console.error("Firmware flashing failed:", error);
           setFlashError(error instanceof Error ? error.message : String(error));
         }
-        // Attempt reset on error
-        try {
-          await port.setSignals({ dataTerminalReady: true, requestToSend: true });
-          await new Promise((resolve) => setTimeout(resolve, 50));
-          await port.setSignals({ dataTerminalReady: true, requestToSend: false });
-        } catch { /* ignore reset error */ }
       } finally {
         setIsFlashing(false);
       }
     },
-    [port, service, isFlashing]
+    [service, flasher, isFlashing]
   );
 
   return { isFlashing, progress, flashStatus, flashError, startFlashing };

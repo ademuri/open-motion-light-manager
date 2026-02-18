@@ -106,4 +106,11 @@ export class SerialService {
     await new Promise((resolve) => setTimeout(resolve, 50));
     await this.connection.setSignals({ dataTerminalReady: true, requestToSend: false });
   }
+
+  /**
+   * Sets the serial port control signals.
+   */
+  async setSignals(signals: SerialOutputSignals): Promise<void> {
+    await this.connection.setSignals(signals);
+  }
 }
