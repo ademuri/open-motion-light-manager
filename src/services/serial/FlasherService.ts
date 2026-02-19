@@ -2,16 +2,17 @@ import { SerialService } from "./SerialService";
 import { CHIP_PARAMETERS } from "../bootloader/constants";
 
 export type FlasherState =
-  | 'idle'
-  | 'entering-bootloader'
-  | 'initializing'
-  | 'unprotecting'
-  | 'erasing'
-  | 'writing'
-  | 'verifying'
-  | 'resetting'
   | 'complete'
-  | 'error';
+  | 'entering-bootloader'
+  | 'erasing'
+  | 'error'
+  | 'idle'
+  | 'initializing'
+  | 'protecting'
+  | 'resetting'
+  | 'unprotecting'
+  | 'verifying'
+  | 'writing';
 
 export interface FlasherProgress {
   state: FlasherState;
@@ -132,6 +133,15 @@ export class FlasherService {
             message: `Verifying flash... ${Math.round((bytesVerified / totalBytes) * 100)}%`
           });
         }
+
+        // Write protect
+        onProgress({
+          state: "protecting",
+          progress: 99,
+          message: "Write protecting...",
+        });
+        await stm32.writeProtectAll(signal);
+        await this.wait(100, signal);
       }, signal);
 
       // 7. Resetting
