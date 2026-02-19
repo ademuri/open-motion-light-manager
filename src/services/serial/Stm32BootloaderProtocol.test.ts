@@ -152,4 +152,40 @@ describe("Stm32BootloaderProtocol", () => {
       expect(data).toEqual(new Uint8Array([0x11, 0x22, 0x33, 0x44]));
       expect(mockTransport.write).toHaveBeenCalledTimes(3);
   });
+
+  it("should write unprotect correctly", async () => {
+    const mockTransport = {
+      write: vi.fn().mockResolvedValue(undefined),
+      readExact: vi.fn().mockResolvedValue(new Uint8Array([BOOTLOADER_PROTOCOL.ACK])),
+    } as unknown as SerialTransport;
+
+    const protocol = new Stm32BootloaderProtocol(mockTransport);
+    await protocol.writeUnprotect();
+
+    expect(mockTransport.write).toHaveBeenCalledWith(new Uint8Array([0x73, 0x8c]));
+    expect(mockTransport.readExact).toHaveBeenCalledTimes(2);
+    expect(mockTransport.readExact).toHaveBeenLastCalledWith(1, { timeout: 10000, signal: undefined });
+  });
+
+  it("should write protect all correctly", async () => {
+    const mockTransport = {
+      write: vi.fn().mockResolvedValue(undefined),
+      readExact: vi.fn().mockResolvedValue(new Uint8Array([BOOTLOADER_PROTOCOL.ACK])),
+    } as unknown as SerialTransport;
+
+    const protocol = new Stm32BootloaderProtocol(mockTransport);
+    await protocol.writeProtectAll();
+
+    expect(mockTransport.write).toHaveBeenCalledTimes(2);
+    expect(mockTransport.write).toHaveBeenNthCalledWith(1, new Uint8Array([0x63, 0x9c]));
+
+    const sentSectorsData = vi.mocked(mockTransport.write).mock.calls[1][0];
+    expect(sentSectorsData[0]).toBe(15); // NUM_SECTORS - 1
+    expect(sentSectorsData.length).toBe(18); // N (1) + 16 sectors + Checksum (1)
+    for (let i = 0; i < 16; i++) {
+      expect(sentSectorsData[i + 1]).toBe(i);
+    }
+    
+    expect(mockTransport.readExact).toHaveBeenCalledWith(1, { timeout: 10000, signal: undefined });
+  });
 });
